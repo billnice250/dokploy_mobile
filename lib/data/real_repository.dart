@@ -7,6 +7,7 @@ class RealDokployRepository implements DokployRepository {
   RealDokployRepository(this.api);
   final DokployApi api;
   Future<CapabilitySet>? _capabilitiesRequest;
+  Future<dynamic>? _projectsRequest;
 
   @override
   Future<CapabilitySet> capabilities() =>
@@ -71,20 +72,25 @@ class RealDokployRepository implements DokployRepository {
   double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
   HealthState _state(dynamic v) {
     final s = '$v'.toLowerCase();
-    if (s.contains('run') || s.contains('done') || s.contains('success')) {
+    if (s.contains('run') ||
+        s.contains('done') ||
+        s.contains('success') ||
+        s == 'active') {
       return HealthState.healthy;
     }
     if (s.contains('deploy') || s.contains('queue') || s.contains('progress')) {
       return HealthState.deploying;
     }
     if (s.contains('fail') || s.contains('error')) return HealthState.failed;
-    if (s.contains('stop') || s.contains('idle')) return HealthState.stopped;
+    if (s.contains('stop') || s.contains('idle') || s == 'inactive') {
+      return HealthState.stopped;
+    }
     return HealthState.unknown;
   }
 
   @override
   Future<List<ProjectModel>> projects() async =>
-      _list(await api.projects()).whereType<Map>().map((project) {
+      _list(await _projectHierarchy()).whereType<Map>().map((project) {
         final environments = _listAt(project, 'environments');
         final serviceCount = environments.fold<int>(
           0,
@@ -103,6 +109,18 @@ class RealDokployRepository implements DokployRepository {
           serviceCount: serviceCount,
         );
       }).toList();
+
+  Future<dynamic> _projectHierarchy() =>
+      _projectsRequest ??= _loadProjectHierarchy();
+
+  Future<dynamic> _loadProjectHierarchy() async {
+    try {
+      return await api.projects();
+    } finally {
+      _projectsRequest = null;
+    }
+  }
+
   @override
   Future<List<DeploymentModel>> deployments() async {
     if (!(await capabilities()).deployments) return const [];
@@ -134,23 +152,108 @@ class RealDokployRepository implements DokployRepository {
   Future<List<ServerModel>> servers() async {
     if (!(await capabilities()).servers) return const [];
     try {
-      return _list(await api.servers())
-          .whereType<Map>()
-          .map((m) => ServerModel(
-              id: _s(m, ['serverId', 'id']),
-              name: _s(m, ['name'], 'Server'),
-              host: _s(m, ['ipAddress', 'host', 'hostname']),
-              status: _state(m['status']),
-              cpu: _d(m['cpu']),
-              memory: _d(m['memory']),
-              disk: _d(m['disk'])))
-          .toList();
+      final caps = await capabilities();
+      final rawServers = _list(await api.servers()).whereType<Map>().toList();
+      final servers = await Future.wait(
+        rawServers.map((server) => _serverWithMetrics(server, caps.metrics)),
+      );
+      if (caps.metrics) {
+        final controlPlane = await _controlPlaneMetrics();
+        if (controlPlane != null &&
+            !servers.any((server) => server.host == controlPlane.host)) {
+          servers.insert(0, controlPlane);
+        }
+      }
+      return servers;
     } on DokployFailure catch (failure) {
       // Server inventory is an administrative capability. A token can be valid
       // for projects/deployments while Dokploy returns 401/403 for server.all.
       if (_isUnavailableCapability(failure)) return const [];
       rethrow;
     }
+  }
+
+  Future<ServerModel> _serverWithMetrics(Map raw, bool metricsAllowed) async {
+    final host = _s(raw, ['ipAddress', 'host', 'hostname']);
+    final base = ServerModel(
+      id: _s(raw, ['serverId', 'id']),
+      name: _s(raw, ['name'], 'Server'),
+      host: host,
+      status: _state(raw['serverStatus'] ?? raw['status']),
+      cpu: 0,
+      memory: 0,
+      disk: 0,
+      metricsAvailable: false,
+    );
+    if (!metricsAllowed || host.isEmpty) return base;
+    final config = _mapAt(_mapAt(raw, 'metricsConfig'), 'server');
+    final token = _s(config, ['token']);
+    final port = int.tryParse(_s(config, ['port'])) ?? 4500;
+    if (token.isEmpty) return base;
+    final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
+    return _loadServerMetrics(base, url.toString(), token);
+  }
+
+  Future<ServerModel?> _controlPlaneMetrics() async {
+    try {
+      final raw = await api.metricsConfig();
+      if (raw is! Map || raw.isEmpty) return null;
+      final config = _mapAt(_mapAt(raw, 'metricsConfig'), 'server');
+      final token = _s(config, ['token']);
+      final host = _s(raw, ['serverIp'], 'localhost');
+      final port = int.tryParse(_s(config, ['port'])) ?? 4500;
+      final base = ServerModel(
+        id: 'dokploy-control-plane',
+        name: 'Dokploy host',
+        host: host,
+        status: HealthState.healthy,
+        cpu: 0,
+        memory: 0,
+        disk: 0,
+        metricsAvailable: false,
+      );
+      if (token.isEmpty) return base;
+      final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
+      return _loadServerMetrics(base, url.toString(), token);
+    } on DokployFailure {
+      return null;
+    }
+  }
+
+  Future<ServerModel> _loadServerMetrics(
+    ServerModel base,
+    String url,
+    String token,
+  ) async {
+    try {
+      final values = _list(
+        await api.serverMetrics(url: url, token: token, dataPoints: 1),
+      ).whereType<Map>();
+      if (values.isEmpty) return base;
+      final metric = values.last;
+      return ServerModel(
+        id: base.id,
+        name: base.name,
+        host: base.host,
+        status: base.status,
+        cpu: _d(metric['cpu']),
+        memory: _d(metric['memUsed']),
+        disk: _d(metric['diskUsed']),
+        metricsAvailable: true,
+        uptimeSeconds: _d(metric['uptime']).round(),
+        networkInKbps: _d(metric['networkIn']),
+        networkOutKbps: _d(metric['networkOut']),
+        memoryUsedGb: _d(metric['memUsedGB']),
+        memoryTotalGb: _d(metric['memTotal']),
+      );
+    } on DokployFailure {
+      return base;
+    }
+  }
+
+  Map _mapAt(Map parent, String key) {
+    final value = parent[key];
+    return value is Map ? value : const {};
   }
 
   bool _isUnavailableCapability(DokployFailure failure) =>
@@ -164,7 +267,7 @@ class RealDokployRepository implements DokployRepository {
     // service hierarchy in Dokploy v0.29.14. Mapping it directly avoids extra
     // project.one requests and keeps this read path compatible with API keys.
     final services = <ServiceModel>[];
-    for (final project in _list(await api.projects()).whereType<Map>()) {
+    for (final project in _list(await _projectHierarchy()).whereType<Map>()) {
       final projectName = _s(project, ['name'], 'Unnamed');
       for (final environment in _listAt(project, 'environments')) {
         for (final entry in _serviceKinds.entries) {

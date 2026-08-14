@@ -111,6 +111,17 @@ class DokployApi {
       post('deployment.killProcess', {'deploymentId': id});
 
   Future<dynamic> servers() => get('server.all');
+  Future<dynamic> metricsConfig() => get('user.getMetricsToken');
+  Future<dynamic> serverMetrics({
+    required String url,
+    required String token,
+    int dataPoints = 1,
+  }) =>
+      get('server.getServerMetrics', {
+        'url': url,
+        'token': token,
+        'dataPoints': '$dataPoints',
+      });
 
   Future<dynamic> postgres(String id) =>
       get('postgres.one', {'postgresId': id});
@@ -144,7 +155,7 @@ class _SafeHttpLogger extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.extra['_dokployLogStartedAt'] =
         DateTime.now().microsecondsSinceEpoch;
-    _write('→ ${options.method} ${options.uri}');
+    _write('→ ${options.method} ${_safeUri(options.uri)}');
     _write('  headers: ${_sanitize(options.headers)}');
     if (options.data != null) _write('  body: ${_format(options.data)}');
     handler.next(options);
@@ -155,7 +166,8 @@ class _SafeHttpLogger extends Interceptor {
       Response<dynamic> response, ResponseInterceptorHandler handler) {
     _write(
       '← ${response.statusCode} ${response.requestOptions.method} '
-      '${response.requestOptions.uri} (${_elapsed(response.requestOptions)})',
+      '${_safeUri(response.requestOptions.uri)} '
+      '(${_elapsed(response.requestOptions)})',
     );
     _write('  response: ${_format(response.data)}');
     handler.next(response);
@@ -166,7 +178,7 @@ class _SafeHttpLogger extends Interceptor {
     final response = error.response;
     _write(
       '← ERROR ${response?.statusCode ?? error.type.name} '
-      '${error.requestOptions.method} ${error.requestOptions.uri} '
+      '${error.requestOptions.method} ${_safeUri(error.requestOptions.uri)} '
       '(${_elapsed(error.requestOptions)})',
     );
     if (response?.data != null) {
@@ -219,6 +231,18 @@ class _SafeHttpLogger extends Interceptor {
         normalized.contains('authorization') ||
         normalized.contains('cookie') ||
         normalized == 'env';
+  }
+
+  Uri _safeUri(Uri uri) {
+    if (uri.queryParameters.isEmpty) return uri;
+    return uri.replace(
+      queryParameters: uri.queryParameters.map(
+        (key, value) => MapEntry(
+          key,
+          _isSensitiveKey(key) ? '<redacted>' : value,
+        ),
+      ),
+    );
   }
 
   String _credentialDescription(String value) {

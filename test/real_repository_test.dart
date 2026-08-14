@@ -1,6 +1,7 @@
 import 'package:dokploy_mobile/data/dokploy_api.dart';
 import 'package:dokploy_mobile/data/real_repository.dart';
 import 'package:dokploy_mobile/domain/failures.dart';
+import 'package:dokploy_mobile/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -118,6 +119,49 @@ void main() {
     expect(deployment.durationSeconds, 5);
     expect(logs, ['building', 'deploying', 'done']);
   });
+
+  test('enriches server inventory with the latest monitoring sample', () async {
+    final repository = RealDokployRepository(
+      _FakeApi(
+        permissionPayload: const {
+          'server': {'read': true},
+          'monitoring': {'read': true},
+        },
+        serverPayload: const [
+          {
+            'serverId': 'server-1',
+            'name': 'Production',
+            'ipAddress': '10.0.0.8',
+            'serverStatus': 'active',
+            'metricsConfig': {
+              'server': {'port': 4500, 'token': 'metrics-secret'},
+            },
+          },
+        ],
+        serverMetricPayload: const [
+          {
+            'cpu': '17.5',
+            'memUsed': '62.3',
+            'memUsedGB': '5.0',
+            'memTotal': '8.0',
+            'diskUsed': '48.2',
+            'networkIn': '12.1',
+            'networkOut': '4.7',
+            'uptime': 86400,
+          },
+        ],
+      ),
+    );
+
+    final server = (await repository.servers()).single;
+
+    expect(server.status, HealthState.healthy);
+    expect(server.metricsAvailable, isTrue);
+    expect(server.cpu, 17.5);
+    expect(server.memory, 62.3);
+    expect(server.disk, 48.2);
+    expect(server.uptimeSeconds, 86400);
+  });
 }
 
 DokployFailure _unauthorized(String operation) => DokployFailure(
@@ -135,6 +179,8 @@ class _FakeApi extends DokployApi {
     this.permissionPayload = const <String, dynamic>{},
     this.deploymentPayload = const <dynamic>[],
     this.deploymentLogPayload = '',
+    this.serverPayload = const <dynamic>[],
+    this.serverMetricPayload = const <dynamic>[],
   }) : super(baseUrl: 'https://dokploy.example.com', apiKey: 'test-token');
 
   final DokployFailure? serverFailure;
@@ -143,6 +189,8 @@ class _FakeApi extends DokployApi {
   final dynamic permissionPayload;
   final dynamic deploymentPayload;
   final dynamic deploymentLogPayload;
+  final dynamic serverPayload;
+  final dynamic serverMetricPayload;
   int projectOneCalls = 0;
   int deploymentCalls = 0;
   int serverCalls = 0;
@@ -176,8 +224,19 @@ class _FakeApi extends DokployApi {
   Future<dynamic> servers() async {
     serverCalls++;
     if (serverFailure case final failure?) throw failure;
-    return <dynamic>[];
+    return serverPayload;
   }
+
+  @override
+  Future<dynamic> metricsConfig() async => const <String, dynamic>{};
+
+  @override
+  Future<dynamic> serverMetrics({
+    required String url,
+    required String token,
+    int dataPoints = 1,
+  }) async =>
+      serverMetricPayload;
 }
 
 const _projectFixture = <dynamic>[

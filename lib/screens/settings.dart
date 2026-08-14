@@ -117,7 +117,7 @@ class SettingsScreen extends ConsumerWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: instance.demo ? DokployTheme.border : DokployTheme.purple,
+            color: instance.demo ? DokployTheme.border : DokployTheme.primary,
             borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(

@@ -48,7 +48,7 @@ class OperationsScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(20),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(Icons.grid_view_rounded, color: DokployTheme.purple),
+            const Icon(Icons.grid_view_rounded, color: DokployTheme.primary),
             const SizedBox(height: 14),
             Text('Command Center',
                 style: Theme.of(c)

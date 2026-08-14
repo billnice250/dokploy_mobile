@@ -44,7 +44,10 @@ The real repository returns empty backup, schedule, and domain collections until
   pause/resume polling, search, bounded tail selection, and copy. Distinct build
   stages are not inferred because Dokploy does not expose them reliably.
 - Logs: bounded loading, filtering, tail selection, refresh, selection, long-press copy, and warning/error color are present. Live streaming, pause/resume, ranges, and export are not.
-- Servers: listing is real, but metrics are only displayed when compatible values are present in the list response.
+- Servers: inventory is enriched with the latest `server.getServerMetrics`
+  sample for configured remote servers. The Dokploy control-plane monitoring
+  configuration is also detected through `user.getMetricsToken`. Missing or
+  unconfigured telemetry is shown as unavailable instead of a false `0%`.
 - Capabilities: `user.getPermissions` is cached per active connection and gates
   optional reads and actions. Version discovery and endpoint-level compatibility
   probing beyond that permission map are not implemented.

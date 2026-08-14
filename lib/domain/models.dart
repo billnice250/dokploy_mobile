@@ -138,10 +138,24 @@ class ServerModel {
       required this.status,
       required this.cpu,
       required this.memory,
-      required this.disk});
+      required this.disk,
+      this.metricsAvailable = true,
+      this.uptimeSeconds = 0,
+      this.networkInKbps = 0,
+      this.networkOutKbps = 0,
+      this.memoryUsedGb = 0,
+      this.memoryTotalGb = 0});
   final String id, name, host;
   final HealthState status;
-  final double cpu, memory, disk;
+  final double cpu,
+      memory,
+      disk,
+      networkInKbps,
+      networkOutKbps,
+      memoryUsedGb,
+      memoryTotalGb;
+  final int uptimeSeconds;
+  final bool metricsAvailable;
 }
 
 class BackupModel {

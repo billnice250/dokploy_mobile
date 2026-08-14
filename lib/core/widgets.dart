@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import 'theme.dart';
@@ -7,7 +9,7 @@ Color statusColor(HealthState s) => switch (s) {
       HealthState.warning => DokployTheme.warning,
       HealthState.failed => DokployTheme.danger,
       HealthState.stopped => DokployTheme.muted,
-      HealthState.deploying => DokployTheme.purple,
+      HealthState.deploying => DokployTheme.info,
       _ => DokployTheme.muted
     };
 String statusLabel(HealthState s) =>
@@ -83,22 +85,73 @@ class MetricCard extends StatelessWidget {
           ])));
 }
 
+class GlassPanel extends StatelessWidget {
+  const GlassPanel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+    this.onTap,
+    this.borderRadius = 16,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(borderRadius);
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Material(
+          color: DokployTheme.panel,
+          shape: RoundedRectangleBorder(
+            borderRadius: radius,
+            side: const BorderSide(color: DokployTheme.border),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: radius,
+            child: Padding(padding: padding, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ProgressMetric extends StatelessWidget {
-  const ProgressMetric({super.key, required this.label, required this.value});
+  const ProgressMetric({
+    super.key,
+    required this.label,
+    required this.value,
+    this.available = true,
+  });
   final String label;
   final double value;
+  final bool available;
   @override
   Widget build(BuildContext c) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(label),
-          Text('${value.toStringAsFixed(0)}%',
+          Text(available ? '${value.toStringAsFixed(0)}%' : 'Not available',
               style: const TextStyle(color: DokployTheme.muted))
         ]),
         const SizedBox(height: 8),
         LinearProgressIndicator(
-            value: (value / 100).clamp(0, 1),
+            value: available ? (value / 100).clamp(0, 1) : 0,
             minHeight: 6,
-            borderRadius: BorderRadius.circular(99))
+            borderRadius: BorderRadius.circular(99),
+            color: available ? _metricColor(value) : DokployTheme.elevated)
       ]);
+
+  Color _metricColor(double value) {
+    if (value >= 90) return DokployTheme.danger;
+    if (value >= 75) return DokployTheme.warning;
+    return DokployTheme.primary;
+  }
 }
