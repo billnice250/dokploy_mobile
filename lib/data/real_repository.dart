@@ -106,18 +106,28 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<List<DeploymentModel>> deployments() async {
     if (!(await capabilities()).deployments) return const [];
-    return _list(await api.deploymentsCentralized())
-        .whereType<Map>()
-        .map((m) => DeploymentModel(
-            id: _s(m, ['deploymentId', 'id']),
-            service: _deploymentService(m),
-            status: _state(m['status']),
-            createdAt:
-                DateTime.tryParse(_s(m, ['createdAt'])) ?? DateTime.now(),
-            commit: _s(m, ['commit', 'commitSha']),
-            branch: _s(m, ['branch'], 'main'),
-            message: _s(m, ['description', 'message'])))
-        .toList();
+    return _list(await api.deploymentsCentralized()).whereType<Map>().map((m) {
+      final startedAt = DateTime.tryParse(_s(m, ['startedAt']));
+      final finishedAt = DateTime.tryParse(_s(m, ['finishedAt']));
+      final duration = startedAt == null
+          ? 0
+          : (finishedAt ?? DateTime.now()).difference(startedAt).inSeconds;
+      return DeploymentModel(
+        id: _s(m, ['deploymentId', 'id']),
+        service: _deploymentService(m),
+        serviceId: _deploymentServiceId(m),
+        status: _state(m['status']),
+        createdAt: DateTime.tryParse(_s(m, ['createdAt'])) ?? DateTime.now(),
+        startedAt: startedAt,
+        finishedAt: finishedAt,
+        durationSeconds: duration < 0 ? 0 : duration,
+        commit: _s(m, ['commit', 'commitSha']),
+        branch: _s(m, ['branch'], 'main'),
+        title: _s(m, ['title', 'trigger']),
+        errorMessage: _s(m, ['errorMessage', 'error']),
+        message: _s(m, ['description', 'message']),
+      );
+    }).toList();
   }
 
   @override
@@ -235,6 +245,24 @@ class RealDokployRepository implements DokployRepository {
     );
   }
 
+  String _deploymentServiceId(Map deployment) {
+    for (final key in ['applicationId', 'composeId']) {
+      final value = _s(deployment, [key]);
+      if (value.isNotEmpty) return value;
+    }
+    for (final entry in const {
+      'application': 'applicationId',
+      'compose': 'composeId',
+    }.entries) {
+      final service = deployment[entry.key];
+      if (service is Map) {
+        final value = _s(service, [entry.value, 'id']);
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return '';
+  }
+
   @override
   Future<DashboardSnapshot> dashboard() async {
     final caps = await capabilities();
@@ -271,6 +299,23 @@ class RealDokployRepository implements DokployRepository {
       if (v is List) return v.map((e) => '$e').toList();
     }
     return ['$data'];
+  }
+
+  @override
+  Future<List<String>> deploymentLogs(String deploymentId,
+      {int tail = 500}) async {
+    if (!(await capabilities()).deployments) {
+      throw _unsupported('deployment.readLogs');
+    }
+    final data = await api.deploymentLogs(deploymentId, tail: tail);
+    if (data is String) return data.isEmpty ? const [] : data.split('\n');
+    if (data is List) return data.map((entry) => '$entry').toList();
+    if (data is Map) {
+      final logs = data['logs'] ?? data['data'];
+      if (logs is String) return logs.isEmpty ? const [] : logs.split('\n');
+      if (logs is List) return logs.map((entry) => '$entry').toList();
+    }
+    return data == null ? const [] : ['$data'];
   }
 
   @override

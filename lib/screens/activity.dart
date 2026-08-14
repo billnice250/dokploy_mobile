@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../core/theme.dart';
@@ -38,6 +39,7 @@ class ActivityScreen extends ConsumerWidget {
                     (deployment) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Card(
+                        clipBehavior: Clip.antiAlias,
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -83,6 +85,17 @@ class ActivityScreen extends ConsumerWidget {
                                   label: const Text('Cancel'),
                                 ),
                               ],
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () => context.push(
+                                    '/deployment/${deployment.id}',
+                                  ),
+                                  icon: const Icon(Icons.subject),
+                                  label: const Text('Details & logs'),
+                                ),
+                              ),
                             ],
                           ),
                         ),

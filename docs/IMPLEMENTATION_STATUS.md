@@ -14,7 +14,8 @@ This document describes the code that exists today. It deliberately does not cou
 - Load application logs with a bounded tail count.
 - Start, stop, and redeploy applications.
 - Start, stop, and deploy Compose stacks.
-- List centralized deployments and request deployment cancellation.
+- List centralized deployments, open deployment detail, read bounded build
+  logs, and request deployment cancellation.
 - List servers when the token has access. Server inventory is capability-gated;
   Dokploy 401/403 responses for `server.all` do not break project or deployment
   views authenticated by the same otherwise-valid token.
@@ -38,7 +39,10 @@ The real repository returns empty backup, schedule, and domain collections until
 
 - Project hierarchy: projects and services work, but environments are not yet first-class domain objects or navigation levels.
 - Compose: stack lifecycle exists, but per-service status, metrics, and logs are not mapped.
-- Deployments: centralized history is mapped defensively; stage tracking and deployment-log navigation are not implemented.
+- Deployments: centralized history, timestamps, duration, failure context, and
+  deployment-log navigation are mapped defensively. Active logs support
+  pause/resume polling, search, bounded tail selection, and copy. Distinct build
+  stages are not inferred because Dokploy does not expose them reliably.
 - Logs: bounded loading, filtering, tail selection, refresh, selection, long-press copy, and warning/error color are present. Live streaming, pause/resume, ranges, and export are not.
 - Servers: listing is real, but metrics are only displayed when compatible values are present in the list response.
 - Capabilities: `user.getPermissions` is cached per active connection and gates

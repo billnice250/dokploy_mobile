@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../core/theme.dart';
@@ -95,7 +96,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
             child: switch (tab) {
               0 => _Overview(service),
               1 => _Logs(service: service),
-              2 => const _Deploys(),
+              2 => _Deploys(serviceId: service.id),
               _ => _Config(service),
             },
           ),
@@ -408,25 +409,33 @@ class _LogsState extends ConsumerState<_Logs> {
 }
 
 class _Deploys extends ConsumerWidget {
-  const _Deploys();
+  const _Deploys({required this.serviceId});
+
+  final String serviceId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deployments =
-        ref.watch(deploymentsProvider).valueOrNull ?? const <DeploymentModel>[];
+    final deployments = (ref.watch(deploymentsProvider).valueOrNull ??
+            const <DeploymentModel>[])
+        .where((deployment) => deployment.serviceId == serviceId)
+        .toList();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         for (final deployment in deployments)
           Card(
             child: ListTile(
+              onTap: () => context.push('/deployment/${deployment.id}'),
               leading: StatusDot(deployment.status),
               title: Text(deployment.commit.isEmpty
                   ? deployment.id
                   : deployment.commit),
               subtitle: Text('${deployment.branch} • ${deployment.message}'),
+              trailing: const Icon(Icons.chevron_right),
             ),
           ),
+        if (deployments.isEmpty)
+          const Center(child: Text('No deployments found for this service.')),
       ],
     );
   }

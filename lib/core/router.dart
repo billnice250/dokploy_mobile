@@ -7,6 +7,7 @@ import '../screens/servers.dart';
 import '../screens/service_detail.dart';
 import '../screens/operations.dart';
 import '../screens/settings.dart';
+import '../screens/deployment_detail.dart';
 
 final router = GoRouter(initialLocation: '/', routes: [
   StatefulShellRoute.indexedStack(
@@ -31,6 +32,11 @@ final router = GoRouter(initialLocation: '/', routes: [
       path: '/service/:id',
       builder: (c, s) =>
           ServiceDetailScreen(serviceId: s.pathParameters['id']!)),
+  GoRoute(
+      path: '/deployment/:id',
+      builder: (c, s) => DeploymentDetailScreen(
+            deploymentId: s.pathParameters['id']!,
+          )),
   GoRoute(path: '/operations', builder: (c, s) => const OperationsScreen()),
   GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
 ]);

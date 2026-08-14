@@ -118,26 +118,38 @@ class MockDokployRepository implements DokployRepository {
         DeploymentModel(
             id: 'd1',
             service: 'J2534 Server',
+            serviceId: 'a2',
             status: HealthState.deploying,
             createdAt: now.subtract(const Duration(minutes: 2)),
+            startedAt: now.subtract(const Duration(minutes: 2)),
             commit: 'a813bc4',
+            title: 'Manual deployment',
             message: 'Release 1.2.29',
             durationSeconds: 134),
         DeploymentModel(
             id: 'd2',
             service: 'PKI Dashboard',
+            serviceId: 'a1',
             status: HealthState.healthy,
             createdAt: now.subtract(const Duration(minutes: 18)),
+            startedAt: now.subtract(const Duration(minutes: 18)),
+            finishedAt: now.subtract(const Duration(minutes: 17)),
             commit: 'dc934ab',
+            title: 'Git push',
             message: 'Fix OIDC callback',
             durationSeconds: 73),
         DeploymentModel(
             id: 'd3',
             service: 'Worker',
+            serviceId: 'a4',
             status: HealthState.failed,
             createdAt: now.subtract(const Duration(hours: 1)),
+            startedAt: now.subtract(const Duration(hours: 1)),
+            finishedAt: now.subtract(const Duration(hours: 1, minutes: -2)),
             commit: '72df91a',
             branch: 'staging',
+            title: 'Git push',
+            errorMessage: 'Container health check failed',
             message: 'Update queue processor',
             durationSeconds: 103),
       ];
@@ -246,6 +258,14 @@ class MockDokployRepository implements DokployRepository {
       80,
       (i) =>
           '${now.subtract(Duration(seconds: 80 - i)).toIso8601String()}  ${i % 11 == 0 ? 'WARN' : 'INFO'}  ${i % 7 == 0 ? 'GET /api/health 200' : 'Application heartbeat ok'}');
+  @override
+  Future<List<String>> deploymentLogs(String deploymentId,
+          {int tail = 500}) async =>
+      List.generate(
+        tail.clamp(1, 80),
+        (i) => '${now.subtract(Duration(seconds: 80 - i)).toIso8601String()}  '
+            '${i == 65 ? 'WARN health check pending' : i == 79 ? 'Deployment step completed' : 'Building layer ${i + 1}'}',
+      );
   @override
   Future<void> start(ServiceModel service) async {}
   @override

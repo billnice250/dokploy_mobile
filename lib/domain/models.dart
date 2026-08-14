@@ -107,13 +107,26 @@ class DeploymentModel {
       required this.service,
       required this.status,
       required this.createdAt,
+      this.serviceId = '',
       this.commit = '',
       this.branch = 'main',
       this.message = '',
+      this.title = '',
+      this.errorMessage = '',
+      this.startedAt,
+      this.finishedAt,
       this.durationSeconds = 0});
-  final String id, service, commit, branch, message;
+  final String id,
+      service,
+      serviceId,
+      commit,
+      branch,
+      message,
+      title,
+      errorMessage;
   final HealthState status;
   final DateTime createdAt;
+  final DateTime? startedAt, finishedAt;
   final int durationSeconds;
 }
 

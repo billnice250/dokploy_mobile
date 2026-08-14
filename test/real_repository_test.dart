@@ -85,6 +85,39 @@ void main() {
       ),
     );
   });
+
+  test('maps deployment detail metadata and bounded logs', () async {
+    final repository = RealDokployRepository(
+      _FakeApi(
+        permissionPayload: const {
+          'deployment': {'read': true},
+        },
+        deploymentPayload: const [
+          {
+            'deploymentId': 'deployment-1',
+            'title': 'Manual deployment',
+            'status': 'done',
+            'createdAt': '2026-08-14T10:00:00.000Z',
+            'startedAt': '2026-08-14T10:00:01.000Z',
+            'finishedAt': '2026-08-14T10:00:06.000Z',
+            'errorMessage': null,
+            'composeId': 'compose-1',
+            'compose': {'composeId': 'compose-1', 'name': 'jellyfin'},
+          },
+        ],
+        deploymentLogPayload: 'building\ndeploying\ndone',
+      ),
+    );
+
+    final deployment = (await repository.deployments()).single;
+    final logs = await repository.deploymentLogs(deployment.id, tail: 3);
+
+    expect(deployment.service, 'jellyfin');
+    expect(deployment.serviceId, 'compose-1');
+    expect(deployment.title, 'Manual deployment');
+    expect(deployment.durationSeconds, 5);
+    expect(logs, ['building', 'deploying', 'done']);
+  });
 }
 
 DokployFailure _unauthorized(String operation) => DokployFailure(
@@ -100,12 +133,16 @@ class _FakeApi extends DokployApi {
     this.projectFailure,
     this.projectPayload = const <dynamic>[],
     this.permissionPayload = const <String, dynamic>{},
+    this.deploymentPayload = const <dynamic>[],
+    this.deploymentLogPayload = '',
   }) : super(baseUrl: 'https://dokploy.example.com', apiKey: 'test-token');
 
   final DokployFailure? serverFailure;
   final DokployFailure? projectFailure;
   final dynamic projectPayload;
   final dynamic permissionPayload;
+  final dynamic deploymentPayload;
+  final dynamic deploymentLogPayload;
   int projectOneCalls = 0;
   int deploymentCalls = 0;
   int serverCalls = 0;
@@ -128,8 +165,12 @@ class _FakeApi extends DokployApi {
   @override
   Future<dynamic> deploymentsCentralized() async {
     deploymentCalls++;
-    return <dynamic>[];
+    return deploymentPayload;
   }
+
+  @override
+  Future<dynamic> deploymentLogs(String id, {int tail = 500}) async =>
+      deploymentLogPayload;
 
   @override
   Future<dynamic> servers() async {

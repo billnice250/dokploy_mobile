@@ -122,7 +122,7 @@ lib/
 - [X] Projects/services
 - [X] Service details
 - [X] Logs
-- [X] Deployments/queue
+- [X] Deployments/queue with detail and bounded build logs
 - [X] Start/stop/redeploy/cancel transport operations
 - [X] Servers UI
 - [X] Backups / schedules / domains / databases surfaces
