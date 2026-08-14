@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-flutter create . --platforms=android,ios
-flutter pub get
-flutter test
-flutter run
+fvm flutter create . --platforms=android,ios
+fvm flutter pub get
+fvm flutter test
+fvm flutter run

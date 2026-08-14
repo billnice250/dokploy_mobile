@@ -65,14 +65,19 @@ Because the API is not URL-versioned, use capability detection and keep compatib
 
 This ZIP is source-first and intentionally does not vendor Flutter SDK/platform-generated build artifacts.
 
-1. Install Flutter stable.
+1. Install FVM and make Flutter `3.44.1` available (`fvm install`).
 2. From this directory run:
 
 ```bash
-flutter create . --platforms=android,ios
-flutter pub get
-flutter run
+fvm flutter create . --platforms=android,ios
+fvm flutter pub get
+fvm flutter run
 ```
+
+Always run Flutter and Dart through FVM in this repository. Plain `flutter`
+uses whichever SDK is globally first on `PATH` and does not apply `.fvmrc`.
+Check the project SDK with `fvm flutter --version`; change the project pin with
+`fvm use <version>`, not `flutter use`.
 
 The app launches in **Demo Infrastructure** mode, so you can inspect the UI without a Dokploy server.
 
