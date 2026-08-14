@@ -24,6 +24,9 @@ final repositoryProvider = StateProvider<DokployRepository>(
 final currentInstanceProvider = StateProvider<DokployInstance>(
   (ref) => demoInstance,
 );
+final capabilitiesProvider = FutureProvider<CapabilitySet>(
+  (ref) => ref.watch(repositoryProvider).capabilities(),
+);
 final dashboardProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).dashboard(),
 );

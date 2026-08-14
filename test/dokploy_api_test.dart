@@ -1,9 +1,44 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:dokploy_mobile/data/dokploy_api.dart';
 import 'package:dokploy_mobile/domain/failures.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('uses the /api path and sends x-api-key', () async {
+    final adapter = _RecordingAdapter();
+    final api = DokployApi(
+      baseUrl: 'https://dokploy.example.com/',
+      apiKey: '  test-token  ',
+      adapter: adapter,
+    );
+
+    await api.projects();
+
+    expect(
+      adapter.request?.uri.toString(),
+      'https://dokploy.example.com/api/project.all',
+    );
+    expect(adapter.request?.headers['x-api-key'], 'test-token');
+  });
+
+  test('does not duplicate an /api suffix in the instance URL', () async {
+    final adapter = _RecordingAdapter();
+    final api = DokployApi(
+      baseUrl: 'https://dokploy.example.com/api/',
+      apiKey: 'test-token',
+      adapter: adapter,
+    );
+
+    await api.projects();
+
+    expect(
+      adapter.request?.uri.toString(),
+      'https://dokploy.example.com/api/project.all',
+    );
+  });
+
   group('Dokploy transport failure mapping', () {
     test('maps unauthorized responses without exposing request headers', () {
       final request = RequestOptions(
@@ -54,4 +89,23 @@ void main() {
       );
     });
   });
+}
+
+class _RecordingAdapter implements HttpClientAdapter {
+  RequestOptions? request;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    request = options;
+    return ResponseBody.fromString('[]', 200, headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    });
+  }
+
+  @override
+  void close({bool force = false}) {}
 }

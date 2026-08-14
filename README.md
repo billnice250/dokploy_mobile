@@ -128,7 +128,8 @@ lib/
 - [X] Backups / schedules / domains / databases surfaces
 - [X] Add Instance → connectivity probe → secure save → live repository wiring
 - [ ] Validate DTOs against a real current Dokploy instance
-- [ ] Formal capability probe and compatibility matrix
+- [X] Permission-based capability gating via `user.getPermissions`
+- [ ] Version/endpoint compatibility matrix
 
 ### v0.2 — Full operational parity
 

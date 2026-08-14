@@ -21,6 +21,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     final services =
         ref.watch(servicesProvider).valueOrNull ?? const <ServiceModel>[];
     final service =
@@ -31,12 +32,18 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
         body: const Center(child: Text('Service not found')),
       );
     }
+    final lifecycleAvailable =
+        capabilities?.lifecycle == true && _supportsLifecycle(service.kind);
     return Scaffold(
       appBar: AppBar(
         title: Text(service.name),
         actions: [
           IconButton(
-            onPressed: () => _showActions(context, service),
+            onPressed: () => _showActions(
+              context,
+              service,
+              lifecycleAvailable: lifecycleAvailable,
+            ),
             icon: const Icon(Icons.more_vert),
           ),
         ],
@@ -55,11 +62,14 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                 ),
                 const Spacer(),
                 FilledButton.tonalIcon(
-                  onPressed: () => _runAction(
-                    context,
-                    'Redeploy',
-                    () => ref.read(repositoryProvider).redeploy(service),
-                  ),
+                  onPressed: lifecycleAvailable
+                      ? () => _runAction(
+                            context,
+                            'Redeploy',
+                            () =>
+                                ref.read(repositoryProvider).redeploy(service),
+                          )
+                      : null,
                   icon: const Icon(Icons.rocket_launch_outlined),
                   label: const Text('Redeploy'),
                 ),
@@ -84,7 +94,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
           Expanded(
             child: switch (tab) {
               0 => _Overview(service),
-              1 => _Logs(serviceId: service.id),
+              1 => _Logs(service: service),
               2 => const _Deploys(),
               _ => _Config(service),
             },
@@ -94,7 +104,8 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
     );
   }
 
-  void _showActions(BuildContext context, ServiceModel service) {
+  void _showActions(BuildContext context, ServiceModel service,
+      {required bool lifecycleAvailable}) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -102,6 +113,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
         child: Wrap(
           children: [
             ListTile(
+              enabled: lifecycleAvailable,
               leading: const Icon(Icons.play_arrow),
               title: const Text('Start'),
               onTap: () {
@@ -114,6 +126,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
               },
             ),
             ListTile(
+              enabled: lifecycleAvailable,
               leading: const Icon(Icons.restart_alt),
               title: const Text('Redeploy'),
               onTap: () {
@@ -126,6 +139,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
               },
             ),
             ListTile(
+              enabled: lifecycleAvailable,
               leading: const Icon(Icons.stop, color: DokployTheme.danger),
               title: const Text('Stop'),
               onTap: () {
@@ -146,6 +160,11 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
       ),
     );
   }
+
+  bool _supportsLifecycle(ServiceKind kind) =>
+      kind == ServiceKind.application ||
+      kind == ServiceKind.compose ||
+      kind == ServiceKind.postgres;
 
   Future<void> _confirmStop(BuildContext context, ServiceModel service) async {
     final confirmed = await showDialog<bool>(
@@ -262,9 +281,9 @@ class _Overview extends StatelessWidget {
 }
 
 class _Logs extends ConsumerStatefulWidget {
-  const _Logs({required this.serviceId});
+  const _Logs({required this.service});
 
-  final String serviceId;
+  final ServiceModel service;
 
   @override
   ConsumerState<_Logs> createState() => _LogsState();
@@ -273,15 +292,23 @@ class _Logs extends ConsumerStatefulWidget {
 class _LogsState extends ConsumerState<_Logs> {
   int tail = 200;
   String search = '';
-  late Future<List<String>> request = _load();
+  Future<List<String>>? request;
 
   Future<List<String>> _load() =>
-      ref.read(repositoryProvider).logs(widget.serviceId, tail: tail);
+      ref.read(repositoryProvider).logs(widget.service.id, tail: tail);
 
   void _reload() => setState(() => request = _load());
 
   @override
   Widget build(BuildContext context) {
+    final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
+    if (capabilities?.logs == false ||
+        widget.service.kind != ServiceKind.application) {
+      return const Center(
+        child: Text('Logs are unavailable for this service.'),
+      );
+    }
+    request ??= _load();
     return Column(
       children: [
         Padding(

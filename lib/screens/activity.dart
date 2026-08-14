@@ -12,6 +12,7 @@ class ActivityScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final deployments = ref.watch(deploymentsProvider);
+    final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Activity'),
@@ -22,69 +23,75 @@ class ActivityScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: deployments.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('$error')),
-        data: (items) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const SectionTitle('Deployment queue'),
-            ...items.map(
-              (deployment) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            StatusDot(deployment.status),
-                            const SizedBox(width: 9),
-                            Expanded(
-                              child: Text(
-                                deployment.service,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700),
+      body: capabilities?.deployments == false
+          ? const Center(
+              child: Text('Deployment activity is unavailable for this token.'),
+            )
+          : deployments.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(child: Text('$error')),
+              data: (items) => ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const SectionTitle('Deployment queue'),
+                  ...items.map(
+                    (deployment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  StatusDot(deployment.status),
+                                  const SizedBox(width: 9),
+                                  Expanded(
+                                    child: Text(
+                                      deployment.service,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                  Text(
+                                    statusLabel(deployment.status),
+                                    style: TextStyle(
+                                        color: statusColor(deployment.status)),
+                                  ),
+                                ],
                               ),
-                            ),
-                            Text(
-                              statusLabel(deployment.status),
-                              style: TextStyle(
-                                  color: statusColor(deployment.status)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${deployment.branch} • ${deployment.commit}',
-                          style: const TextStyle(color: DokployTheme.muted),
-                        ),
-                        if (deployment.message.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(deployment.message),
-                        ],
-                        if (deployment.status == HealthState.deploying) ...[
-                          const SizedBox(height: 14),
-                          const LinearProgressIndicator(),
-                          const SizedBox(height: 10),
-                          OutlinedButton.icon(
-                            onPressed: () =>
-                                _confirmCancel(context, ref, deployment),
-                            icon: const Icon(Icons.close),
-                            label: const Text('Cancel'),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${deployment.branch} • ${deployment.commit}',
+                                style:
+                                    const TextStyle(color: DokployTheme.muted),
+                              ),
+                              if (deployment.message.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(deployment.message),
+                              ],
+                              if (deployment.status == HealthState.deploying &&
+                                  capabilities?.cancelDeployments != false) ...[
+                                const SizedBox(height: 14),
+                                const LinearProgressIndicator(),
+                                const SizedBox(height: 10),
+                                OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _confirmCancel(context, ref, deployment),
+                                  icon: const Icon(Icons.close),
+                                  label: const Text('Cancel'),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                      ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 

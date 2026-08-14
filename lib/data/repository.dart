@@ -1,6 +1,7 @@
 import '../domain/models.dart';
 
 abstract interface class DokployRepository {
+  Future<CapabilitySet> capabilities();
   Future<DashboardSnapshot> dashboard();
   Future<List<ProjectModel>> projects();
   Future<List<ServiceModel>> services();

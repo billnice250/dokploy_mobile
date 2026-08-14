@@ -25,20 +25,44 @@ class DokployInstance {
 }
 
 class CapabilitySet {
-  const CapabilitySet(
-      {this.logs = true,
-      this.deployments = true,
-      this.compose = true,
-      this.metrics = true,
-      this.backups = true,
-      this.schedules = true,
-      this.domains = true,
-      this.terminal = false,
-      this.databases = true});
+  const CapabilitySet({
+    this.logs = false,
+    this.deployments = false,
+    this.cancelDeployments = false,
+    this.lifecycle = false,
+    this.compose = false,
+    this.metrics = false,
+    this.servers = false,
+    this.backups = false,
+    this.schedules = false,
+    this.domains = false,
+    this.terminal = false,
+    this.databases = false,
+  });
+
+  static const core = CapabilitySet(compose: true, databases: true);
+
+  static const demo = CapabilitySet(
+    logs: true,
+    deployments: true,
+    cancelDeployments: true,
+    lifecycle: true,
+    compose: true,
+    metrics: true,
+    servers: true,
+    backups: true,
+    schedules: true,
+    domains: true,
+    databases: true,
+  );
+
   final bool logs,
       deployments,
+      cancelDeployments,
+      lifecycle,
       compose,
       metrics,
+      servers,
       backups,
       schedules,
       domains,

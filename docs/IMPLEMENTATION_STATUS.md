@@ -15,7 +15,9 @@ This document describes the code that exists today. It deliberately does not cou
 - Start, stop, and redeploy applications.
 - Start, stop, and deploy Compose stacks.
 - List centralized deployments and request deployment cancellation.
-- List servers when the token has access.
+- List servers when the token has access. Server inventory is capability-gated;
+  Dokploy 401/403 responses for `server.all` do not break project or deployment
+  views authenticated by the same otherwise-valid token.
 - Map HTTP, connectivity, timeout, and TLS failures into app-owned failure categories.
 
 These paths use the real `DokployApi` through `RealDokployRepository`; widgets do not call Dio.
@@ -39,7 +41,9 @@ The real repository returns empty backup, schedule, and domain collections until
 - Deployments: centralized history is mapped defensively; stage tracking and deployment-log navigation are not implemented.
 - Logs: bounded loading, filtering, tail selection, refresh, selection, long-press copy, and warning/error color are present. Live streaming, pause/resume, ranges, and export are not.
 - Servers: listing is real, but metrics are only displayed when compatible values are present in the list response.
-- Capabilities: unsupported advanced features are withheld, but formal per-instance capability probing and version discovery are not implemented.
+- Capabilities: `user.getPermissions` is cached per active connection and gates
+  optional reads and actions. Version discovery and endpoint-level compatibility
+  probing beyond that permission map are not implemented.
 
 ## Planned / unavailable
 

@@ -6,6 +6,9 @@
 - Preferences contain profile identifiers, display names, base URLs, and discovered version metadata only.
 - Real instance enrollment requires HTTPS. The transport does not install a permissive certificate callback.
 - API keys are never added to error text, domain objects, or UI state.
+- Debug HTTP tracing redacts credentials and sensitive response fields. API
+  keys are represented only by their trimmed length and a 12-character SHA-256
+  fingerprint so developers can verify which key was sent without exposing it.
 - Mutating POST requests are not automatically retried.
 - Stop and deployment-cancel actions require confirmation.
 - Log requests use bounded tail counts.

@@ -94,6 +94,9 @@ class MockDokployRepository implements DokployRepository {
   ];
 
   @override
+  Future<CapabilitySet> capabilities() async => CapabilitySet.demo;
+
+  @override
   Future<DashboardSnapshot> dashboard() async => DashboardSnapshot(
           running: 17,
           stopped: 2,

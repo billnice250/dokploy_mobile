@@ -1,24 +1,36 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../domain/failures.dart';
 
 /// Thin RPC-style Dokploy transport. Endpoint names and transport failures stay
 /// here so they cannot leak into widgets or app-owned domain models.
 class DokployApi {
-  DokployApi({required String baseUrl, required String apiKey})
-      : _dio = Dio(
+  DokployApi({
+    required String baseUrl,
+    required String apiKey,
+    HttpClientAdapter? adapter,
+  }) : _dio = Dio(
           BaseOptions(
-            baseUrl: '${baseUrl.replaceAll(RegExp(r'/$'), '')}/api',
+            baseUrl: _apiBaseUrl(baseUrl),
             connectTimeout: const Duration(seconds: 10),
             sendTimeout: const Duration(seconds: 15),
             receiveTimeout: const Duration(seconds: 30),
             headers: {
-              'x-api-key': apiKey,
+              'x-api-key': apiKey.trim(),
               'Accept': 'application/json',
               'Content-Type': 'application/json',
             },
           ),
-        );
+        ) {
+    if (adapter != null) _dio.httpClientAdapter = adapter;
+    if (kDebugMode) {
+      _dio.interceptors.add(_SafeHttpLogger(apiKey.trim()));
+    }
+  }
 
   final Dio _dio;
 
@@ -29,7 +41,7 @@ class DokployApi {
   ]) async {
     try {
       return (await _dio.get<dynamic>(
-        '/$procedure',
+        procedure,
         queryParameters: query,
         cancelToken: cancelToken,
       ))
@@ -47,7 +59,7 @@ class DokployApi {
     try {
       // Mutations are deliberately never retried here.
       return (await _dio.post<dynamic>(
-        '/$procedure',
+        procedure,
         data: body ?? const {},
         cancelToken: cancelToken,
       ))
@@ -58,6 +70,7 @@ class DokployApi {
   }
 
   Future<dynamic> projects() => get('project.all');
+  Future<dynamic> permissions() => get('user.getPermissions');
   Future<dynamic> homeStats() => get('project.homeStats');
   Future<dynamic> project(String id) => get('project.one', {'projectId': id});
 
@@ -109,6 +122,115 @@ class DokployApi {
       post('postgres.stop', {'postgresId': id});
   Future<void> deployPostgres(String id) async =>
       post('postgres.deploy', {'postgresId': id});
+}
+
+String _apiBaseUrl(String input) {
+  final uri = Uri.parse(input.trim());
+  var path = uri.path.replaceAll(RegExp(r'/+$'), '');
+  if (!path.endsWith('/api')) path = '$path/api';
+  return uri.replace(path: '$path/').toString();
+}
+
+class _SafeHttpLogger extends Interceptor {
+  _SafeHttpLogger(this.apiKey) {
+    _write(
+      'configured x-api-key: ${_credentialDescription(apiKey)}',
+    );
+  }
+
+  final String apiKey;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra['_dokployLogStartedAt'] =
+        DateTime.now().microsecondsSinceEpoch;
+    _write('→ ${options.method} ${options.uri}');
+    _write('  headers: ${_sanitize(options.headers)}');
+    if (options.data != null) _write('  body: ${_format(options.data)}');
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(
+      Response<dynamic> response, ResponseInterceptorHandler handler) {
+    _write(
+      '← ${response.statusCode} ${response.requestOptions.method} '
+      '${response.requestOptions.uri} (${_elapsed(response.requestOptions)})',
+    );
+    _write('  response: ${_format(response.data)}');
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException error, ErrorInterceptorHandler handler) {
+    final response = error.response;
+    _write(
+      '← ERROR ${response?.statusCode ?? error.type.name} '
+      '${error.requestOptions.method} ${error.requestOptions.uri} '
+      '(${_elapsed(error.requestOptions)})',
+    );
+    if (response?.data != null) {
+      _write('  response: ${_format(response?.data)}');
+    }
+    _write('  message: ${error.message}');
+    handler.next(error);
+  }
+
+  String _elapsed(RequestOptions options) {
+    final started = options.extra['_dokployLogStartedAt'];
+    if (started is! int) return 'unknown duration';
+    final elapsed = DateTime.now().microsecondsSinceEpoch - started;
+    return '${(elapsed / 1000).round()} ms';
+  }
+
+  String _format(dynamic value) {
+    final rendered = '${_sanitize(value)}';
+    const limit = 4000;
+    return rendered.length <= limit
+        ? rendered
+        : '${rendered.substring(0, limit)}… <truncated>';
+  }
+
+  dynamic _sanitize(dynamic value, {String? key}) {
+    if (key != null && _isSensitiveKey(key)) {
+      if (key.toLowerCase() == 'x-api-key' && value is String) {
+        return _credentialDescription(value);
+      }
+      return '<redacted>';
+    }
+    if (value is Map) {
+      return value.map(
+        (entryKey, entryValue) => MapEntry(
+          '$entryKey',
+          _sanitize(entryValue, key: '$entryKey'),
+        ),
+      );
+    }
+    if (value is Iterable) return value.map(_sanitize).toList();
+    return value;
+  }
+
+  bool _isSensitiveKey(String key) {
+    final normalized = key.toLowerCase().replaceAll(RegExp('[^a-z]'), '');
+    return normalized.contains('password') ||
+        normalized.contains('secret') ||
+        normalized.contains('token') ||
+        normalized.contains('apikey') ||
+        normalized.contains('authorization') ||
+        normalized.contains('cookie') ||
+        normalized == 'env';
+  }
+
+  String _credentialDescription(String value) {
+    final normalized = value.trim();
+    final fingerprint = sha256.convert(utf8.encode(normalized)).toString();
+    final whitespace =
+        normalized.length == value.length ? '' : ', whitespace-trimmed';
+    return '<redacted length=${normalized.length}, '
+        'sha256=${fingerprint.substring(0, 12)}$whitespace>';
+  }
+
+  void _write(String message) => debugPrint('[Dokploy HTTP] $message');
 }
 
 DokployFailure mapDioFailure(DioException error, String operation) {

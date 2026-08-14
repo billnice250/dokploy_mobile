@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers.dart';
 import '../core/widgets.dart';
 import '../core/theme.dart';
+import '../domain/models.dart';
 
 class OperationsScreen extends ConsumerWidget {
   const OperationsScreen({super.key});
   @override
   Widget build(BuildContext c, WidgetRef ref) {
+    final capabilities =
+        ref.watch(capabilitiesProvider).valueOrNull ?? const CapabilitySet();
     return Scaffold(
         appBar: AppBar(title: const Text('Operations')),
         body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -17,23 +20,26 @@ class OperationsScreen extends ConsumerWidget {
               Icons.backup_outlined,
               'Backups',
               'Database, volume and control-plane backups',
-              () => _showBackups(c, ref)),
-          _nav(Icons.schedule, 'Scheduled jobs',
-              'Cron jobs, run history and logs', () => _showSchedules(c, ref)),
+              capabilities.backups ? () => _showBackups(c, ref) : null),
+          _nav(
+              Icons.schedule,
+              'Scheduled jobs',
+              'Cron jobs, run history and logs',
+              capabilities.schedules ? () => _showSchedules(c, ref) : null),
           _nav(Icons.language, 'Domains', 'Routes, HTTPS and target ports',
-              () => _showDomains(c, ref)),
+              capabilities.domains ? () => _showDomains(c, ref) : null),
           _nav(Icons.storage, 'Databases',
-              'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', () {}),
+              'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', null),
           const SectionTitle('Power tools'),
           _nav(
               Icons.terminal,
               'Terminal',
               'Application / Compose / database shell (capability gated)',
-              () {}),
+              capabilities.terminal ? () {} : null),
           _nav(Icons.notifications_active_outlined, 'Notifications',
-              'Deployment failures, backup failures and health alerts', () {}),
+              'Deployment failures, backup failures and health alerts', null),
           _nav(Icons.widgets_outlined, 'Widgets & shortcuts',
-              'Home-screen health and quick actions', () {}),
+              'Home-screen health and quick actions', null),
         ]));
   }
 
@@ -54,7 +60,7 @@ class OperationsScreen extends ConsumerWidget {
                 'Fast access to operational workflows designed for a phone.',
                 style: TextStyle(color: DokployTheme.muted))
           ])));
-  Widget _nav(IconData i, String t, String s, VoidCallback onTap) => Padding(
+  Widget _nav(IconData i, String t, String s, VoidCallback? onTap) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Card(
           child: ListTile(

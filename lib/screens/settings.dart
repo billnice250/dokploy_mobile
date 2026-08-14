@@ -350,6 +350,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _invalidateData(WidgetRef ref) {
+    ref.invalidate(capabilitiesProvider);
     ref.invalidate(dashboardProvider);
     ref.invalidate(projectsProvider);
     ref.invalidate(servicesProvider);

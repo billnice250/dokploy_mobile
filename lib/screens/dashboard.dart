@@ -12,6 +12,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(dashboardProvider);
     final inst = ref.watch(currentInstanceProvider);
+    final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     return Scaffold(
         appBar: AppBar(
             title: Row(children: [
@@ -99,7 +100,11 @@ class DashboardScreen extends ConsumerWidget {
                                         accent: DokployTheme.danger))
                               ])),
                           const SectionTitle('Recent deployments'),
-                          ...d.deployments.map((x) => _DeploymentTile(x)),
+                          if (capabilities?.deployments == false)
+                            const _UnavailableCard(
+                                'Deployment history is unavailable for this token.')
+                          else
+                            ...d.deployments.map((x) => _DeploymentTile(x)),
                           const SectionTitle('Attention'),
                           ...d.attention.map((x) => Card(
                               child: ListTile(
@@ -108,29 +113,43 @@ class DashboardScreen extends ConsumerWidget {
                                       color: DokployTheme.warning),
                                   title: Text(x),
                                   trailing: const Icon(Icons.chevron_right)))),
-                          const SectionTitle('Servers'),
-                          ...d.servers.take(3).map((s) => Card(
-                              child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(children: [
-                                    Row(children: [
-                                      StatusDot(s.status),
-                                      const SizedBox(width: 9),
-                                      Expanded(
-                                          child: Text(s.name,
-                                              style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.w600))),
-                                      Text(s.host,
-                                          style: const TextStyle(
-                                              color: DokployTheme.muted,
-                                              fontSize: 12))
-                                    ]),
-                                    const SizedBox(height: 16),
-                                    ProgressMetric(label: 'Disk', value: s.disk)
-                                  ])))),
+                          if (capabilities?.servers != false) ...[
+                            const SectionTitle('Servers'),
+                            ...d.servers.take(3).map((s) => Card(
+                                child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(children: [
+                                      Row(children: [
+                                        StatusDot(s.status),
+                                        const SizedBox(width: 9),
+                                        Expanded(
+                                            child: Text(s.name,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600))),
+                                        Text(s.host,
+                                            style: const TextStyle(
+                                                color: DokployTheme.muted,
+                                                fontSize: 12))
+                                      ]),
+                                      const SizedBox(height: 16),
+                                      ProgressMetric(
+                                          label: 'Disk', value: s.disk)
+                                    ])))),
+                          ],
                         ]))));
   }
+}
+
+class _UnavailableCard extends StatelessWidget {
+  const _UnavailableCard(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Card(
+      child: ListTile(
+          leading: const Icon(Icons.lock_outline, color: DokployTheme.muted),
+          title: Text(message)));
 }
 
 class _DeploymentTile extends StatelessWidget {
