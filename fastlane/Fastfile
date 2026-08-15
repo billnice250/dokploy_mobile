@@ -24,7 +24,7 @@ platform :android do
     upload_to_play_store(
       aab: ENV.fetch("ANDROID_AAB_PATH"),
       json_key_data: ENV.fetch("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"),
-      package_name: "it.billnice.dokploymobile",
+      package_name: "it.billnice.apps.dokploy",
       track: "internal",
       release_status: "draft",
       skip_upload_metadata: true,

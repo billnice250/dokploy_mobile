@@ -1,2 +1,2 @@
-app_identifier("it.billnice.dokployMobile")
-package_name("it.billnice.dokploymobile")
+app_identifier("it.billnice.apps.dokploy")
+package_name("it.billnice.apps.dokploy")

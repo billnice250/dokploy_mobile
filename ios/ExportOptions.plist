@@ -16,7 +16,7 @@
 	<true/>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>it.billnice.dokployMobile</key>
+		<key>it.billnice.apps.dokploy</key>
 		<string>DOKPLOY_PROFILE_NAME</string>
 	</dict>
 </dict>

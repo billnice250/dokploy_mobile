@@ -7,8 +7,8 @@ repository secrets below exist.
 
 ## Stable application identifiers
 
-- iOS bundle ID: `it.billnice.dokployMobile`
-- Android application ID: `it.billnice.dokploymobile`
+- iOS bundle ID: `it.billnice.apps.dokploy`
+- Android application ID: `it.billnice.apps.dokploy`
 
 These identifiers should not be changed after the first store upload.
 
@@ -32,7 +32,7 @@ The certificate, profile and `.p8` key values are base64-encoded file contents.
 
 ## Google Play preparation
 
-1. Create the app in Play Console using `it.billnice.dokploymobile`.
+1. Create the app in Play Console using `it.billnice.apps.dokploy`.
 2. Create the upload keystore and enroll it in Play App Signing.
 3. Enable the Google Play Developer API and grant a service account release
    access to this app.

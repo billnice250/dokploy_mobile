@@ -257,7 +257,7 @@ class _SafeHttpLogger extends Interceptor {
   }
 
   bool _isSensitiveKey(String key) {
-    final normalized = key.toLowerCase().replaceAll(RegExp('[^a-z]'), '');
+    final normalized = key.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
     return normalized.contains('password') ||
         normalized.contains('secret') ||
         normalized.contains('token') ||
