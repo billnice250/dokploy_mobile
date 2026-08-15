@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
+import '../core/app_notice.dart';
+import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
@@ -131,14 +133,29 @@ class ActivityScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
+    final authorized = await confirmSensitiveOperation(
+      context,
+      ref,
+      reason: 'Confirm cancellation of ${deployment.service} deployment.',
+    );
+    if (!authorized || !context.mounted) return;
     try {
       await ref.read(repositoryProvider).cancelDeployment(deployment.id);
       ref.invalidate(deploymentsProvider);
+      if (context.mounted) {
+        DployGoNotice.show(
+          context,
+          message: 'Deployment cancellation requested.',
+          tone: DployGoNoticeTone.success,
+        );
+      }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not cancel deployment: $error')),
+        DployGoNotice.show(
+          context,
+          message: 'Could not cancel deployment: $error',
+          tone: DployGoNoticeTone.error,
         );
       }
     }

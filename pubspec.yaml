@@ -1,7 +1,7 @@
 name: dokploy_mobile
-description: A polished, unofficial Flutter mobile console for Dokploy.
+description: A polished, unofficial  mobile console for Dokploy.
 publish_to: "none"
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

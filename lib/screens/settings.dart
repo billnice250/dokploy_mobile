@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
+import '../core/app_notice.dart';
+import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
 import '../data/dokploy_api.dart';
 import '../data/mock_repository.dart';
@@ -182,8 +184,10 @@ class SettingsScreen extends ConsumerWidget {
     final apiKey = await store.apiKey(instance.id);
     if (apiKey == null || apiKey.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This instance has no stored API key.')),
+        DployGoNotice.show(
+          context,
+          message: 'This instance has no stored API key.',
+          tone: DployGoNoticeTone.warning,
         );
       }
       return;
@@ -220,10 +224,23 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
+    final authorized = await confirmSensitiveOperation(
+      context,
+      ref,
+      reason: 'Confirm removal of ${instance.name} and its saved API key.',
+    );
+    if (!authorized || !context.mounted) return;
     await ref.read(instanceStoreProvider).remove(instance.id);
     if (ref.read(currentInstanceProvider).id == instance.id) _useDemo(ref);
     ref.invalidate(instancesProvider);
+    if (context.mounted) {
+      DployGoNotice.show(
+        context,
+        message: '${instance.name} was removed from this device.',
+        tone: DployGoNoticeTone.success,
+      );
+    }
   }
 
   void _useDemo(WidgetRef ref) {
@@ -335,9 +352,10 @@ class SettingsScreen extends ConsumerWidget {
                           _invalidateData(ref);
                           if (sheetContext.mounted) Navigator.pop(sheetContext);
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Dokploy instance connected.')),
+                            DployGoNotice.show(
+                              context,
+                              message: 'Dokploy instance connected.',
+                              tone: DployGoNoticeTone.success,
                             );
                           }
                         } catch (failure) {

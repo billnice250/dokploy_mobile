@@ -15,7 +15,7 @@ These identifiers should not be changed after the first store upload.
 ## App Store Connect preparation
 
 1. Register the bundle ID in the Apple Developer portal.
-2. Create the **Dokploy Mobile** app record in App Store Connect.
+2. Create the **DployGo** app record in App Store Connect.
 3. Create an App Store distribution certificate and provisioning profile.
 4. Create an App Store Connect API key with permission to upload builds.
 5. Add these GitHub Actions secrets:
@@ -52,4 +52,4 @@ TestFlight uploads do not automatically submit the app for App Review.
 
 Before public release, complete privacy disclosures, screenshots, descriptions,
 support/privacy URLs, content rating, export compliance and platform review
-notes. Dokploy Mobile is unofficial, so its listing should state that clearly.
+notes. DployGo is unofficial, so its listing should state that clearly.

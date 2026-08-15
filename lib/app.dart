@@ -62,7 +62,7 @@ class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
       });
     }
     return MaterialApp.router(
-      title: 'Dokploy Mobile',
+      title: 'DployGo',
       debugShowCheckedModeBanner: false,
       theme: DokployTheme.light,
       darkTheme: DokployTheme.dark,

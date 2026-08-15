@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Dokploy Mobile</string>
+		<string>DployGo</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -15,7 +15,11 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>dokploy_mobile</string>
+		<string>DployGo</string>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
+		<key>NSFaceIDUsageDescription</key>
+		<string>DployGo uses Face ID to confirm sensitive server operations.</string>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>

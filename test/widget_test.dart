@@ -1,6 +1,7 @@
 import 'package:dokploy_mobile/app.dart';
 import 'package:dokploy_mobile/core/providers.dart';
 import 'package:dokploy_mobile/core/router.dart';
+import 'package:dokploy_mobile/core/biometric_confirmation.dart';
 import 'package:dokploy_mobile/data/mock_repository.dart';
 import 'package:dokploy_mobile/domain/models.dart';
 import 'package:dokploy_mobile/screens/service_detail.dart';
@@ -124,6 +125,75 @@ void main() {
     expect(find.text('The latest sample is stale'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('sensitive service mutation requires biometric confirmation',
+      (tester) async {
+    final repository = _SensitiveRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => repository),
+          sensitiveOperationAuthorizerProvider.overrideWith(
+            (ref) => _FakeAuthorizer(BiometricConfirmationResult.denied),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ServiceDetailScreen(serviceId: 'ollama'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Redeploy'));
+    await tester.pumpAndSettle();
+
+    expect(repository.redeployCalls, 0);
+    expect(find.text('Confirmation required'), findsOneWidget);
+    expect(find.textContaining('Biometric confirmation'), findsOneWidget);
+  });
+
+  testWidgets('confirmed mutation uses the DployGo feedback banner',
+      (tester) async {
+    final repository = _SensitiveRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => repository),
+          sensitiveOperationAuthorizerProvider.overrideWith(
+            (ref) => _FakeAuthorizer(BiometricConfirmationResult.confirmed),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ServiceDetailScreen(serviceId: 'ollama'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Redeploy'));
+    await tester.pumpAndSettle();
+
+    expect(repository.redeployCalls, 1);
+    expect(find.text('Done'), findsOneWidget);
+    expect(find.text('Redeploy requested successfully.'), findsOneWidget);
+  });
+}
+
+class _FakeAuthorizer implements SensitiveOperationAuthorizer {
+  const _FakeAuthorizer(this.result);
+
+  final BiometricConfirmationResult result;
+
+  @override
+  Future<BiometricConfirmationResult> confirm({required String reason}) async =>
+      result;
+}
+
+class _SensitiveRepository extends _MetricRepository {
+  int redeployCalls = 0;
+
+  @override
+  Future<void> redeploy(ServiceModel service) async => redeployCalls++;
 }
 
 class _MetricRepository extends MockDokployRepository {

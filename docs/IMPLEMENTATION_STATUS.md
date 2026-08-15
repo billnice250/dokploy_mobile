@@ -79,7 +79,7 @@ The real repository returns empty backup, schedule, and domain collections until
   failure mapping, deployment transition alerts, and overnight quiet hours.
 - Android debug APK and iOS simulator builds pass with the notification plugin.
 - Native launcher icons and dark splash screens are generated from the shared
-  Dokploy Mobile brand mark.
+  DployGo brand mark.
 - A manual, draft-only GitHub Actions release workflow is scaffolded for Google
   Play internal testing and TestFlight. Store records, signing material and
   repository secrets are still required before it can upload.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/local_notifications.dart';
+import '../core/app_notice.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
@@ -44,11 +45,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
                                   .instance
                                   .requestPermission();
                               if (!granted && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'Notification permission was not granted. Alerts remain in the in-app center.'),
-                                  ),
+                                DployGoNotice.show(
+                                  context,
+                                  message:
+                                      'Notification permission was not granted. Alerts remain in the in-app center.',
+                                  tone: DployGoNoticeTone.warning,
                                 );
                               }
                             }

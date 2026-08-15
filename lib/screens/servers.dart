@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
+import '../core/app_notice.dart';
+import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
@@ -221,6 +223,7 @@ class ServersScreen extends ConsumerWidget {
             serverId: server.id == 'dokploy-control-plane' ? null : server.id,
           ),
       success: 'Monitoring enabled. Refresh after the first sample arrives.',
+      biometricReason: 'Confirm monitoring setup on ${server.name}.',
       ref: ref,
     );
   }
@@ -262,6 +265,7 @@ class ServersScreen extends ConsumerWidget {
             serverId: server.id == 'dokploy-control-plane' ? null : server.id,
           ),
       success: 'Docker cleanup completed. Storage updates on the next sample.',
+      biometricReason: 'Confirm permanent Docker cleanup on ${server.name}.',
       ref: ref,
     );
   }
@@ -270,8 +274,15 @@ class ServersScreen extends ConsumerWidget {
     BuildContext context,
     Future<void> Function() operation, {
     required String success,
+    required String biometricReason,
     required WidgetRef ref,
   }) async {
+    final authorized = await confirmSensitiveOperation(
+      context,
+      ref,
+      reason: biometricReason,
+    );
+    if (!authorized || !context.mounted) return;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -283,14 +294,18 @@ class ServersScreen extends ConsumerWidget {
       Navigator.of(context, rootNavigator: true).pop();
       ref.invalidate(serversProvider);
       ref.invalidate(dashboardProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success)),
+      DployGoNotice.show(
+        context,
+        message: success,
+        tone: DployGoNoticeTone.success,
       );
     } catch (error) {
       if (!context.mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Operation failed: $error')),
+      DployGoNotice.show(
+        context,
+        message: 'Operation failed: $error',
+        tone: DployGoNoticeTone.error,
       );
     }
   }

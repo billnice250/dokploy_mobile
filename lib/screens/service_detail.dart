@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
+import '../core/app_notice.dart';
+import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
@@ -210,18 +212,28 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
     String label,
     Future<void> Function() action,
   ) async {
+    final authorized = await confirmSensitiveOperation(
+      context,
+      ref,
+      reason: 'Confirm ${label.toLowerCase()} for this service in DployGo.',
+    );
+    if (!authorized || !context.mounted) return;
     try {
       await action();
       ref.invalidate(servicesProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label requested successfully.')),
+        DployGoNotice.show(
+          context,
+          message: '$label requested successfully.',
+          tone: DployGoNoticeTone.success,
         );
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label failed: $error')),
+        DployGoNotice.show(
+          context,
+          message: '$label failed: $error',
+          tone: DployGoNoticeTone.error,
         );
       }
     }
@@ -448,8 +460,10 @@ class _LogsState extends ConsumerState<_Logs> {
                       await Clipboard.setData(
                           ClipboardData(text: lines[index]));
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Log line copied.')),
+                        DployGoNotice.show(
+                          context,
+                          message: 'Log line copied.',
+                          tone: DployGoNoticeTone.success,
                         );
                       }
                     },

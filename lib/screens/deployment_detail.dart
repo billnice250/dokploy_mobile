@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/providers.dart';
+import '../core/app_notice.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
@@ -175,8 +176,10 @@ class _DeploymentDetailScreenState
   Future<void> _copyLine(String line) async {
     await Clipboard.setData(ClipboardData(text: line));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Log line copied.')),
+      DployGoNotice.show(
+        context,
+        message: 'Log line copied.',
+        tone: DployGoNoticeTone.success,
       );
     }
   }
@@ -184,8 +187,10 @@ class _DeploymentDetailScreenState
   Future<void> _copyAll() async {
     await Clipboard.setData(ClipboardData(text: _loadedLogs.join('\n')));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${_loadedLogs.length} log lines copied.')),
+      DployGoNotice.show(
+        context,
+        message: '${_loadedLogs.length} log lines copied.',
+        tone: DployGoNoticeTone.success,
       );
     }
   }

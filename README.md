@@ -1,4 +1,4 @@
-# Dokploy Mobile
+# DployGo
 
 An **unofficial Flutter mobile console for Dokploy**, designed for operations from a phone rather than as a pixel-for-pixel port of the web dashboard.
 
