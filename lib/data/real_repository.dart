@@ -74,9 +74,35 @@ class RealDokployRepository implements DokployRepository {
 
   double _d(dynamic value) {
     if (value is num) return value.toDouble();
-    final normalized = '$value'.trim().replaceAll(',', '.');
-    final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(normalized);
-    return match == null ? 0 : double.tryParse(match.group(0)!) ?? 0;
+    final text = '$value'.trim().replaceAll(',', '.');
+    var token = '';
+    var hasDigit = false;
+    var hasDecimal = false;
+    for (final codeUnit in text.codeUnits) {
+      final isDigit = codeUnit >= 48 && codeUnit <= 57;
+      if (isDigit) {
+        token += String.fromCharCode(codeUnit);
+        hasDigit = true;
+        continue;
+      }
+      if (codeUnit == 45 && token.isEmpty) {
+        token = '-';
+        continue;
+      }
+      if (codeUnit == 46 && !hasDecimal) {
+        token = switch (token) {
+          '' => '0.',
+          '-' => '-0.',
+          _ => '$token.',
+        };
+        hasDecimal = true;
+        continue;
+      }
+      if (hasDigit) break;
+      token = '';
+      hasDecimal = false;
+    }
+    return double.tryParse(token) ?? 0;
   }
 
   HealthState _state(dynamic v) {
@@ -461,7 +487,11 @@ class RealDokployRepository implements DokployRepository {
   double _toMegabytes(dynamic value) {
     final text = '$value'.trim();
     final amount = _d(text);
-    final unit = text.replaceAll(RegExp(r'[0-9.,\s-]'), '').toLowerCase();
+    final unit = String.fromCharCodes(
+      text.toLowerCase().codeUnits.where(
+            (codeUnit) => codeUnit >= 97 && codeUnit <= 122,
+          ),
+    );
     return switch (unit) {
       'b' => amount / (1024 * 1024),
       'kb' || 'kib' => amount / 1024,

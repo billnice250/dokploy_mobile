@@ -1,2 +1,6 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+
+// Do not inherit CocoaPods' TOOLCHAIN_DIR-based Swift runtime path. Xcode 26
+// may point TOOLCHAIN_DIR at Metal.xctoolchain, which has no iOS Swift libs.
+LIBRARY_SEARCH_PATHS = $(SDKROOT)/usr/lib/swift /usr/lib/swift

@@ -309,8 +309,13 @@ class SettingsScreen extends ConsumerWidget {
                 onPressed: busy
                     ? null
                     : () async {
-                        final normalized =
-                            url.text.trim().replaceAll(RegExp(r'/$'), '');
+                        var normalized = url.text.trim();
+                        while (normalized.endsWith('/')) {
+                          normalized = normalized.substring(
+                            0,
+                            normalized.length - 1,
+                          );
+                        }
                         final uri = Uri.tryParse(normalized);
                         if (uri == null ||
                             uri.scheme != 'https' ||

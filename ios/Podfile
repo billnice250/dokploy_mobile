@@ -38,5 +38,18 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Xcode 26 can resolve TOOLCHAIN_DIR to its separately downloaded Metal
+    # toolchain. That toolchain has no platform Swift runtime directory, while
+    # CocoaPods adds ${TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME} for Swift
+    # pods. Point the affected pod at the runtime shipped in the selected SDK.
+    next unless target.name == 'flutter_secure_storage'
+
+    target.build_configurations.each do |config|
+      config.build_settings['LIBRARY_SEARCH_PATHS'] = [
+        '$(SDKROOT)/usr/lib/swift',
+        '/usr/lib/swift',
+      ]
+    end
   end
 end

@@ -160,7 +160,10 @@ class DokployApi {
 
 String _apiBaseUrl(String input) {
   final uri = Uri.parse(input.trim());
-  var path = uri.path.replaceAll(RegExp(r'/+$'), '');
+  var path = uri.path;
+  while (path.endsWith('/')) {
+    path = path.substring(0, path.length - 1);
+  }
   if (!path.endsWith('/api')) path = '$path/api';
   return uri.replace(path: '$path/').toString();
 }
@@ -257,7 +260,11 @@ class _SafeHttpLogger extends Interceptor {
   }
 
   bool _isSensitiveKey(String key) {
-    final normalized = key.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    final normalized = String.fromCharCodes(
+      key.toLowerCase().codeUnits.where(
+            (codeUnit) => codeUnit >= 97 && codeUnit <= 122,
+          ),
+    );
     return normalized.contains('password') ||
         normalized.contains('secret') ||
         normalized.contains('token') ||
