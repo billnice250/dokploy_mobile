@@ -1,0 +1,107 @@
+name: Android → Play Console
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play track (internal, closed, open, production)"
+        required: true
+        default: "internal"
+      build_number:
+        description: "Override build number (versionCode)"
+        required: false
+        default: ""
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # REQUIRED for Workload Identity Federation (GitHub OIDC)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug GitHub ref
+        run: |
+          echo "event: ${{ github.event_name }}"
+          echo "ref:   ${{ github.ref }}"
+          echo "repo:  ${{ github.repository }}"
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # ✅ Keyless auth to Google via Workload Identity Federation
+      - name: Auth to Google (WIF)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: "projects/96345954330/locations/global/workloadIdentityPools/github/providers/github-provider"
+          service_account: "moneytone@bill-apps-ci-build.iam.gserviceaccount.com"
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Debug ADC file
+        run: |
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS"
+          ls -lah "$GOOGLE_APPLICATION_CREDENTIALS"
+          
+      - name: Setup Ruby for Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: android
+
+      # ---- Android signing (key.properties) ----
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/keystore.p12
+
+      - name: Write signing password file
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/keystore.pass
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=keystore.p12
+          passwordFile=keystore.pass
+          EOF
+          if [ -n "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
+          fi
+
+      - name: Bundle install
+        working-directory: android
+        run: bundle install
+
+      - name: Compute build number (start at 20)
+        run: |
+          if [ -n "${{ inputs.build_number }}" ]; then
+            echo "BUILD_NUMBER=${{ inputs.build_number }}" >> $GITHUB_ENV
+          else
+            echo "BUILD_NUMBER=$((20 + ${{ github.run_number }}))" >> $GITHUB_ENV
+          fi
+      - name: Deploy to Play
+        working-directory: android
+        env:
+          BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
+          # GOOGLE_APPLICATION_CREDENTIALS is set automatically by the auth step
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            bundle exec fastlane android deploy track:production
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            bundle exec fastlane android deploy track:${{ inputs.track }} build_number:${{ env.BUILD_NUMBER }}
+          else
+            bundle exec fastlane android deploy track:internal
+          fi

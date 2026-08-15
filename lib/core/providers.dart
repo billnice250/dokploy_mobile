@@ -38,6 +38,9 @@ final projectsProvider = FutureProvider(
 final servicesProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).services(),
 );
+final serviceDetailProvider = FutureProvider.family<ServiceModel, ServiceModel>(
+  (ref, service) => ref.watch(repositoryProvider).serviceDetails(service),
+);
 final deploymentsProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).deployments(),
 );

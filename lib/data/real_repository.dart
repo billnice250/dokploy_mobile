@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'dokploy_api.dart';
 import 'repository.dart';
 import '../domain/failures.dart';
@@ -69,7 +72,13 @@ class RealDokployRepository implements DokployRepository {
     return fallback;
   }
 
-  double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  double _d(dynamic value) {
+    if (value is num) return value.toDouble();
+    final normalized = '$value'.trim().replaceAll(',', '.');
+    final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(normalized);
+    return match == null ? 0 : double.tryParse(match.group(0)!) ?? 0;
+  }
+
   HealthState _state(dynamic v) {
     final s = '$v'.toLowerCase();
     if (s.contains('run') ||
@@ -184,6 +193,7 @@ class RealDokployRepository implements DokployRepository {
       memory: 0,
       disk: 0,
       metricsAvailable: false,
+      monitoringConfigured: false,
     );
     if (!metricsAllowed || host.isEmpty) return base;
     final config = _mapAt(_mapAt(raw, 'metricsConfig'), 'server');
@@ -191,7 +201,11 @@ class RealDokployRepository implements DokployRepository {
     final port = int.tryParse(_s(config, ['port'])) ?? 4500;
     if (token.isEmpty) return base;
     final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
-    return _loadServerMetrics(base, url.toString(), token);
+    return _loadServerMetrics(
+      base.copyWith(monitoringConfigured: true),
+      url.toString(),
+      token,
+    );
   }
 
   Future<ServerModel?> _controlPlaneMetrics() async {
@@ -211,10 +225,15 @@ class RealDokployRepository implements DokployRepository {
         memory: 0,
         disk: 0,
         metricsAvailable: false,
+        monitoringConfigured: false,
       );
       if (token.isEmpty) return base;
       final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
-      return _loadServerMetrics(base, url.toString(), token);
+      return _loadServerMetrics(
+        base.copyWith(monitoringConfigured: true),
+        url.toString(),
+        token,
+      );
     } on DokployFailure {
       return null;
     }
@@ -226,30 +245,101 @@ class RealDokployRepository implements DokployRepository {
     String token,
   ) async {
     try {
-      final values = _list(
-        await api.serverMetrics(url: url, token: token, dataPoints: 1),
+      final values = _metricList(
+        await api.serverMetrics(url: url, token: token, dataPoints: 3),
       ).whereType<Map>();
       if (values.isEmpty) return base;
       final metric = values.last;
-      return ServerModel(
-        id: base.id,
-        name: base.name,
-        host: base.host,
-        status: base.status,
-        cpu: _d(metric['cpu']),
-        memory: _d(metric['memUsed']),
-        disk: _d(metric['diskUsed']),
+      return base.copyWith(
+        cpu: _metricNumber(metric, ['cpu', 'CPU', 'cpuUsage']),
+        memory: _metricNumber(
+          metric,
+          ['memUsed', 'memory', 'memoryUsed', 'memoryUsedPercentage'],
+        ),
+        disk: _metricNumber(
+          metric,
+          ['diskUsed', 'diskUsage', 'diskUsedPercentage'],
+        ),
         metricsAvailable: true,
-        uptimeSeconds: _d(metric['uptime']).round(),
-        networkInKbps: _d(metric['networkIn']),
-        networkOutKbps: _d(metric['networkOut']),
-        memoryUsedGb: _d(metric['memUsedGB']),
-        memoryTotalGb: _d(metric['memTotal']),
+        monitoringConfigured: true,
+        uptimeSeconds: _metricNumber(metric, ['uptime']).round(),
+        networkInKbps: _metricNumber(metric, ['networkIn']),
+        networkOutKbps: _metricNumber(metric, ['networkOut']),
+        memoryUsedGb: _metricNumber(metric, ['memUsedGB', 'memoryUsedGB']),
+        memoryTotalGb: _metricNumber(metric, ['memTotal', 'memoryTotal']),
+        diskTotalGb: _metricNumber(metric, ['totalDisk', 'diskTotal']),
       );
     } on DokployFailure {
       return base;
     }
   }
+
+  List<dynamic> _metricList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map) {
+      for (final key in [
+        'data',
+        'metrics',
+        'serverMetrics',
+        'items',
+        'result',
+      ]) {
+        final nested = data[key];
+        if (nested is List) return nested;
+        if (nested is Map) {
+          final values = _metricList(nested);
+          if (values.isNotEmpty) return values;
+        }
+      }
+      if (data.keys.any((key) =>
+          const ['cpu', 'CPU', 'memUsed', 'diskUsed'].contains('$key'))) {
+        return [data];
+      }
+    }
+    return const [];
+  }
+
+  double _metricNumber(Map metric, List<String> keys) {
+    for (final key in keys) {
+      if (metric[key] != null) return _d(metric[key]);
+    }
+    return 0;
+  }
+
+  @override
+  Future<void> setupMonitoring({String? serverId}) async {
+    final random = Random.secure();
+    final token = base64UrlEncode(
+      List<int>.generate(48, (_) => random.nextInt(256)),
+    ).replaceAll('=', '');
+    final config = <String, dynamic>{
+      'server': {
+        'refreshRate': 60,
+        'port': 4500,
+        'token': token,
+        'urlCallback': api.monitoringCallbackUrl,
+        'retentionDays': 2,
+        'cronJob': '0 0 * * *',
+        'thresholds': {'cpu': 0, 'memory': 0},
+      },
+      'containers': {
+        'refreshRate': 60,
+        'services': {
+          'include': <String>[],
+          'exclude': <String>[],
+        },
+      },
+    };
+    if (serverId == null) {
+      await api.setupControlPlaneMonitoring(config);
+    } else {
+      await api.setupServerMonitoring(serverId, config);
+    }
+  }
+
+  @override
+  Future<void> pruneDocker({String? serverId}) =>
+      api.cleanDockerPrune(serverId: serverId);
 
   Map _mapAt(Map parent, String key) {
     final value = parent[key];
@@ -287,6 +377,8 @@ class RealDokployRepository implements DokployRepository {
                 image: _s(service, ['dockerImage', 'image']),
                 domain: '',
                 appName: _s(service, ['appName', 'name']),
+                serverId: _s(service, ['serverId']),
+                metricsAvailable: false,
               ),
             );
           }
@@ -294,6 +386,89 @@ class RealDokployRepository implements DokployRepository {
       }
     }
     return services;
+  }
+
+  @override
+  Future<ServiceModel> serviceDetails(ServiceModel service) async {
+    try {
+      final raw = switch (service.kind) {
+        ServiceKind.application => await api.application(service.id),
+        ServiceKind.compose => await api.compose(service.id),
+        _ => null,
+      };
+      if (raw is! Map) return service;
+
+      final domains = _listAt(raw, 'domains');
+      final detailed = service.copyWith(
+        name: _s(raw, ['name'], service.name),
+        image: _s(raw, ['dockerImage', 'image'], service.image),
+        domain: domains.isEmpty
+            ? service.domain
+            : _s(domains.first, ['host'], service.domain),
+        appName: _s(raw, ['appName'], service.appName),
+        serverId: _s(raw, ['serverId'], service.serverId),
+      );
+      if (service.kind != ServiceKind.application ||
+          detailed.appName.isEmpty ||
+          !(await capabilities()).metrics) {
+        return detailed;
+      }
+      return _applicationWithMonitoring(detailed);
+    } on DokployFailure catch (failure) {
+      if (_isUnavailableCapability(failure)) return service;
+      rethrow;
+    }
+  }
+
+  Future<ServiceModel> _applicationWithMonitoring(ServiceModel service) async {
+    try {
+      final raw = await api.applicationMonitoring(service.appName);
+      if (raw is! Map) return service;
+      final cpu = _latestMonitoringValue(raw, 'cpu');
+      final memory = _latestMonitoringValue(raw, 'memory');
+      final network = _latestMonitoringValue(raw, 'network');
+      final timestamps = [cpu, memory, network]
+          .map((entry) => DateTime.tryParse(_s(entry, ['time'])))
+          .whereType<DateTime>()
+          .toList();
+      final memoryValue = _mapAt(memory, 'value');
+      final networkValue = _mapAt(network, 'value');
+      final hasMetrics =
+          cpu.isNotEmpty || memory.isNotEmpty || network.isNotEmpty;
+      return service.copyWith(
+        cpu: _d(cpu['value']),
+        memoryMb: _toMegabytes(memoryValue['used']),
+        networkReceivedMb: _toMegabytes(networkValue['inputMb']),
+        networkSentMb: _toMegabytes(networkValue['outputMb']),
+        metricsAvailable: hasMetrics,
+        metricsUpdatedAt: timestamps.isEmpty
+            ? null
+            : timestamps.reduce((a, b) => a.isAfter(b) ? a : b),
+      );
+    } on DokployFailure catch (failure) {
+      if (_isUnavailableCapability(failure)) return service;
+      rethrow;
+    }
+  }
+
+  Map _latestMonitoringValue(Map raw, String key) {
+    final values = raw[key];
+    return values is List && values.isNotEmpty && values.last is Map
+        ? values.last as Map
+        : const {};
+  }
+
+  double _toMegabytes(dynamic value) {
+    final text = '$value'.trim();
+    final amount = _d(text);
+    final unit = text.replaceAll(RegExp(r'[0-9.,\s-]'), '').toLowerCase();
+    return switch (unit) {
+      'b' => amount / (1024 * 1024),
+      'kb' || 'kib' => amount / 1024,
+      'gb' || 'gib' => amount * 1024,
+      'tb' || 'tib' => amount * 1024 * 1024,
+      _ => amount,
+    };
   }
 
   static const _serviceKinds = <String, ServiceKind>{

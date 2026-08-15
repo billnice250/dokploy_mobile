@@ -51,6 +51,10 @@ The real repository returns empty backup, schedule, and domain collections until
   sample for configured remote servers. The Dokploy control-plane monitoring
   configuration is also detected through `user.getMetricsToken`. Missing or
   unconfigured telemetry is shown as unavailable instead of a false `0%`.
+  Metric parsing accepts wrapped responses and formatted percentages, and shows
+  total/used/free storage when `totalDisk` is returned. Owners can configure
+  monitoring and run the confirmed `settings.cleanDockerPrune` cleanup from the
+  server card.
 - Capabilities: `user.getPermissions` is cached per active connection and gates
   optional reads and actions. Version discovery and endpoint-level compatibility
   probing beyond that permission map are not implemented.

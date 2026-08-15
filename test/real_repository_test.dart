@@ -145,6 +145,7 @@ void main() {
             'memUsedGB': '5.0',
             'memTotal': '8.0',
             'diskUsed': '48.2',
+            'totalDisk': '120.0',
             'networkIn': '12.1',
             'networkOut': '4.7',
             'uptime': 86400,
@@ -160,7 +161,129 @@ void main() {
     expect(server.cpu, 17.5);
     expect(server.memory, 62.3);
     expect(server.disk, 48.2);
+    expect(server.diskTotalGb, 120);
+    expect(server.diskFreeGb, closeTo(62.16, 0.01));
     expect(server.uptimeSeconds, 86400);
+  });
+
+  test('maps wrapped metrics and formatted percentage values', () async {
+    final repository = RealDokployRepository(
+      _FakeApi(
+        permissionPayload: const {
+          'server': {'read': true},
+          'monitoring': {'read': true},
+        },
+        serverPayload: const [
+          {
+            'serverId': 'server-1',
+            'name': 'Production',
+            'ipAddress': '10.0.0.8',
+            'serverStatus': 'active',
+            'metricsConfig': {
+              'server': {'port': 4500, 'token': 'metrics-secret'},
+            },
+          },
+        ],
+        serverMetricPayload: const {
+          'data': {
+            'metrics': [
+              {
+                'CPU': '21.4%',
+                'memoryUsedPercentage': '63,5 %',
+                'diskUsedPercentage': '71.25%',
+                'diskTotal': '240 GB',
+              },
+            ],
+          },
+        },
+      ),
+    );
+
+    final server = (await repository.servers()).single;
+
+    expect(server.metricsAvailable, isTrue);
+    expect(server.monitoringConfigured, isTrue);
+    expect(server.cpu, 21.4);
+    expect(server.memory, 63.5);
+    expect(server.disk, 71.25);
+    expect(server.diskTotalGb, 240);
+  });
+
+  test('configures monitoring with a generated token and targets cleanup',
+      () async {
+    final api = _FakeApi();
+    final repository = RealDokployRepository(api);
+
+    await repository.setupMonitoring();
+    await repository.pruneDocker(serverId: 'server-1');
+
+    final serverConfig = api.controlPlaneMonitoringConfig?['server'] as Map;
+    expect(serverConfig['token'], isA<String>());
+    expect((serverConfig['token'] as String).length, greaterThanOrEqualTo(64));
+    expect(serverConfig['port'], 4500);
+    expect(
+      serverConfig['urlCallback'],
+      'https://dokploy.example.com/api/trpc/notification.receiveNotification',
+    );
+    expect(api.prunedServerId, 'server-1');
+  });
+
+  test('hydrates application metadata and preserves monitoring units',
+      () async {
+    final api = _FakeApi(
+      permissionPayload: const {
+        'monitoring': {'read': true},
+      },
+      applicationPayload: const {
+        'applicationId': 'application-1',
+        'name': 'ollama',
+        'appName': 'internal-applications-ollama-mx5teo',
+        'dockerImage': 'ollama/ollama:latest',
+        'domains': [
+          {'host': 'ollama.example.com'},
+        ],
+      },
+      applicationMonitoringPayload: const {
+        'cpu': [
+          {'value': '401.55%', 'time': '2026-08-16T08:00:00.000Z'},
+        ],
+        'memory': [
+          {
+            'value': {'used': '7.368GiB', 'total': '12.1GiB'},
+            'time': '2026-08-16T08:00:00.000Z',
+          },
+        ],
+        'network': [
+          {
+            'value': {'inputMb': '10.4MB', 'outputMb': '3.73MB'},
+            'time': '2026-08-16T08:00:00.000Z',
+          },
+        ],
+      },
+    );
+    final repository = RealDokployRepository(api);
+    const listed = ServiceModel(
+      id: 'application-1',
+      name: 'ollama',
+      kind: ServiceKind.application,
+      status: HealthState.healthy,
+      metricsAvailable: false,
+    );
+
+    final service = await repository.serviceDetails(listed);
+
+    expect(service.appName, 'internal-applications-ollama-mx5teo');
+    expect(service.image, 'ollama/ollama:latest');
+    expect(service.domain, 'ollama.example.com');
+    expect(service.metricsAvailable, isTrue);
+    expect(service.cpu, 401.55);
+    expect(service.memoryMb, closeTo(7544.832, 0.001));
+    expect(service.networkReceivedMb, 10.4);
+    expect(service.networkSentMb, 3.73);
+    expect(
+      service.metricsUpdatedAt,
+      DateTime.parse('2026-08-16T08:00:00.000Z'),
+    );
   });
 }
 
@@ -181,6 +304,8 @@ class _FakeApi extends DokployApi {
     this.deploymentLogPayload = '',
     this.serverPayload = const <dynamic>[],
     this.serverMetricPayload = const <dynamic>[],
+    this.applicationPayload = const <String, dynamic>{},
+    this.applicationMonitoringPayload = const <String, dynamic>{},
   }) : super(baseUrl: 'https://dokploy.example.com', apiKey: 'test-token');
 
   final DokployFailure? serverFailure;
@@ -191,9 +316,13 @@ class _FakeApi extends DokployApi {
   final dynamic deploymentLogPayload;
   final dynamic serverPayload;
   final dynamic serverMetricPayload;
+  final dynamic applicationPayload;
+  final dynamic applicationMonitoringPayload;
   int projectOneCalls = 0;
   int deploymentCalls = 0;
   int serverCalls = 0;
+  Map<String, dynamic>? controlPlaneMonitoringConfig;
+  String? prunedServerId;
 
   @override
   Future<dynamic> projects() async {
@@ -209,6 +338,13 @@ class _FakeApi extends DokployApi {
     projectOneCalls++;
     throw StateError('project.one should not be needed for project.all data');
   }
+
+  @override
+  Future<dynamic> application(String id) async => applicationPayload;
+
+  @override
+  Future<dynamic> applicationMonitoring(String appName) async =>
+      applicationMonitoringPayload;
 
   @override
   Future<dynamic> deploymentsCentralized() async {
@@ -237,6 +373,18 @@ class _FakeApi extends DokployApi {
     int dataPoints = 1,
   }) async =>
       serverMetricPayload;
+
+  @override
+  Future<void> setupControlPlaneMonitoring(
+    Map<String, dynamic> metricsConfig,
+  ) async {
+    controlPlaneMonitoringConfig = metricsConfig;
+  }
+
+  @override
+  Future<void> cleanDockerPrune({String? serverId}) async {
+    prunedServerId = serverId;
+  }
 }
 
 const _projectFixture = <dynamic>[

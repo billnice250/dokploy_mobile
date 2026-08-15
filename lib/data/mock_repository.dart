@@ -34,8 +34,8 @@ class MockDokployRepository implements DokployRepository {
         domain: 'pki.example.com',
         cpu: 4.2,
         memoryMb: 287,
-        networkDownMbps: 1.4,
-        networkUpMbps: .3,
+        networkReceivedMb: 1.4,
+        networkSentMb: .3,
         appName: 'pki-dashboard'),
     ServiceModel(
         id: 'c1',
@@ -47,8 +47,8 @@ class MockDokployRepository implements DokployRepository {
         domain: 'media.example.com',
         cpu: 18,
         memoryMb: 1240,
-        networkDownMbps: 24,
-        networkUpMbps: 1.8,
+        networkReceivedMb: 24,
+        networkSentMb: 1.8,
         appName: 'media-stack'),
     ServiceModel(
         id: 'a2',
@@ -113,6 +113,8 @@ class MockDokployRepository implements DokployRepository {
   Future<List<ProjectModel>> projects() async => _projects;
   @override
   Future<List<ServiceModel>> services() async => _services;
+  @override
+  Future<ServiceModel> serviceDetails(ServiceModel service) async => service;
   @override
   Future<List<DeploymentModel>> deployments() async => [
         DeploymentModel(
@@ -274,4 +276,8 @@ class MockDokployRepository implements DokployRepository {
   Future<void> redeploy(ServiceModel service) async {}
   @override
   Future<void> cancelDeployment(String deploymentId) async {}
+  @override
+  Future<void> setupMonitoring({String? serverId}) async {}
+  @override
+  Future<void> pruneDocker({String? serverId}) async {}
 }

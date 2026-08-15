@@ -92,13 +92,50 @@ class ServiceModel {
       this.domain = '',
       this.cpu = 0,
       this.memoryMb = 0,
-      this.networkDownMbps = 0,
-      this.networkUpMbps = 0,
-      this.appName = ''});
-  final String id, name, project, image, domain, appName;
+      this.networkReceivedMb = 0,
+      this.networkSentMb = 0,
+      this.appName = '',
+      this.serverId = '',
+      this.metricsAvailable = true,
+      this.metricsUpdatedAt});
+  final String id, name, project, image, domain, appName, serverId;
   final ServiceKind kind;
   final HealthState status;
-  final double cpu, memoryMb, networkDownMbps, networkUpMbps;
+  final double cpu, memoryMb, networkReceivedMb, networkSentMb;
+  final bool metricsAvailable;
+  final DateTime? metricsUpdatedAt;
+
+  ServiceModel copyWith({
+    String? name,
+    HealthState? status,
+    String? image,
+    String? domain,
+    String? appName,
+    String? serverId,
+    double? cpu,
+    double? memoryMb,
+    double? networkReceivedMb,
+    double? networkSentMb,
+    bool? metricsAvailable,
+    DateTime? metricsUpdatedAt,
+  }) =>
+      ServiceModel(
+        id: id,
+        name: name ?? this.name,
+        kind: kind,
+        status: status ?? this.status,
+        project: project,
+        image: image ?? this.image,
+        domain: domain ?? this.domain,
+        appName: appName ?? this.appName,
+        serverId: serverId ?? this.serverId,
+        cpu: cpu ?? this.cpu,
+        memoryMb: memoryMb ?? this.memoryMb,
+        networkReceivedMb: networkReceivedMb ?? this.networkReceivedMb,
+        networkSentMb: networkSentMb ?? this.networkSentMb,
+        metricsAvailable: metricsAvailable ?? this.metricsAvailable,
+        metricsUpdatedAt: metricsUpdatedAt ?? this.metricsUpdatedAt,
+      );
 }
 
 class DeploymentModel {
@@ -144,7 +181,9 @@ class ServerModel {
       this.networkInKbps = 0,
       this.networkOutKbps = 0,
       this.memoryUsedGb = 0,
-      this.memoryTotalGb = 0});
+      this.memoryTotalGb = 0,
+      this.diskTotalGb = 0,
+      this.monitoringConfigured = true});
   final String id, name, host;
   final HealthState status;
   final double cpu,
@@ -153,9 +192,44 @@ class ServerModel {
       networkInKbps,
       networkOutKbps,
       memoryUsedGb,
-      memoryTotalGb;
+      memoryTotalGb,
+      diskTotalGb;
   final int uptimeSeconds;
-  final bool metricsAvailable;
+  final bool metricsAvailable, monitoringConfigured;
+
+  double get diskUsedGb => diskTotalGb * disk / 100;
+  double get diskFreeGb => diskTotalGb - diskUsedGb;
+
+  ServerModel copyWith({
+    double? cpu,
+    double? memory,
+    double? disk,
+    bool? metricsAvailable,
+    bool? monitoringConfigured,
+    int? uptimeSeconds,
+    double? networkInKbps,
+    double? networkOutKbps,
+    double? memoryUsedGb,
+    double? memoryTotalGb,
+    double? diskTotalGb,
+  }) =>
+      ServerModel(
+        id: id,
+        name: name,
+        host: host,
+        status: status,
+        cpu: cpu ?? this.cpu,
+        memory: memory ?? this.memory,
+        disk: disk ?? this.disk,
+        metricsAvailable: metricsAvailable ?? this.metricsAvailable,
+        monitoringConfigured: monitoringConfigured ?? this.monitoringConfigured,
+        uptimeSeconds: uptimeSeconds ?? this.uptimeSeconds,
+        networkInKbps: networkInKbps ?? this.networkInKbps,
+        networkOutKbps: networkOutKbps ?? this.networkOutKbps,
+        memoryUsedGb: memoryUsedGb ?? this.memoryUsedGb,
+        memoryTotalGb: memoryTotalGb ?? this.memoryTotalGb,
+        diskTotalGb: diskTotalGb ?? this.diskTotalGb,
+      );
 }
 
 class BackupModel {

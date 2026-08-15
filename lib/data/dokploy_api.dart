@@ -13,7 +13,8 @@ class DokployApi {
     required String baseUrl,
     required String apiKey,
     HttpClientAdapter? adapter,
-  }) : _dio = Dio(
+  })  : monitoringCallbackUrl = _monitoringCallbackUrl(baseUrl),
+        _dio = Dio(
           BaseOptions(
             baseUrl: _apiBaseUrl(baseUrl),
             connectTimeout: const Duration(seconds: 10),
@@ -33,6 +34,10 @@ class DokployApi {
   }
 
   final Dio _dio;
+
+  /// Public callback consumed by Dokploy's monitoring sidecar for threshold
+  /// events. This must be an absolute URL even when thresholds are disabled.
+  final String monitoringCallbackUrl;
 
   Future<dynamic> get(
     String procedure, [
@@ -76,6 +81,8 @@ class DokployApi {
 
   Future<dynamic> application(String id) =>
       get('application.one', {'applicationId': id});
+  Future<dynamic> applicationMonitoring(String appName) =>
+      get('application.readAppMonitoring', {'appName': appName});
   Future<dynamic> applicationLogs(String id, {int tail = 200}) => get(
         'application.readLogs',
         {'applicationId': id, 'tail': tail.clamp(1, 10000)},
@@ -122,6 +129,22 @@ class DokployApi {
         'token': token,
         'dataPoints': '$dataPoints',
       });
+  Future<void> setupControlPlaneMonitoring(
+    Map<String, dynamic> metricsConfig,
+  ) async =>
+      post('admin.setupMonitoring', {'metricsConfig': metricsConfig});
+  Future<void> setupServerMonitoring(
+    String serverId,
+    Map<String, dynamic> metricsConfig,
+  ) async =>
+      post('server.setupMonitoring', {
+        'serverId': serverId,
+        'metricsConfig': metricsConfig,
+      });
+  Future<void> cleanDockerPrune({String? serverId}) async => post(
+        'settings.cleanDockerPrune',
+        {if (serverId != null) 'serverId': serverId},
+      );
 
   Future<dynamic> postgres(String id) =>
       get('postgres.one', {'postgresId': id});
@@ -140,6 +163,17 @@ String _apiBaseUrl(String input) {
   var path = uri.path.replaceAll(RegExp(r'/+$'), '');
   if (!path.endsWith('/api')) path = '$path/api';
   return uri.replace(path: '$path/').toString();
+}
+
+String _monitoringCallbackUrl(String input) {
+  final uri = Uri.parse(input.trim());
+  return uri
+      .replace(
+        path: '/api/trpc/notification.receiveNotification',
+        query: null,
+        fragment: null,
+      )
+      .toString();
 }
 
 class _SafeHttpLogger extends Interceptor {

@@ -25,14 +25,16 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
     final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     final services =
         ref.watch(servicesProvider).valueOrNull ?? const <ServiceModel>[];
-    final service =
+    final listedService =
         services.where((item) => item.id == widget.serviceId).firstOrNull;
-    if (service == null) {
+    if (listedService == null) {
       return Scaffold(
         appBar: AppBar(),
         body: const Center(child: Text('Service not found')),
       );
     }
+    final detail = ref.watch(serviceDetailProvider(listedService));
+    final service = detail.valueOrNull ?? listedService;
     final lifecycleAvailable =
         capabilities?.lifecycle == true && _supportsLifecycle(service.kind);
     return Scaffold(
@@ -94,7 +96,13 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
           ),
           Expanded(
             child: switch (tab) {
-              0 => _Overview(service),
+              0 => _Overview(
+                  service,
+                  loading: detail.isLoading,
+                  error: detail.hasError,
+                  onRefresh: () =>
+                      ref.invalidate(serviceDetailProvider(listedService)),
+                ),
               1 => _Logs(service: service),
               2 => _Deploys(serviceId: service.id),
               _ => _Config(service),
@@ -221,65 +229,132 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
 }
 
 class _Overview extends StatelessWidget {
-  const _Overview(this.service);
+  const _Overview(
+    this.service, {
+    required this.loading,
+    required this.error,
+    required this.onRefresh,
+  });
 
   final ServiceModel service;
+  final bool loading, error;
+  final VoidCallback onRefresh;
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.5,
-            children: [
-              MetricCard(
-                label: 'CPU',
-                value: '${service.cpu.toStringAsFixed(1)}%',
-                icon: Icons.memory,
-              ),
-              MetricCard(
-                label: 'Memory',
-                value: '${service.memoryMb.toStringAsFixed(0)} MB',
-                icon: Icons.storage,
-              ),
-              MetricCard(
-                label: 'Download',
-                value: '${service.networkDownMbps.toStringAsFixed(1)} Mbps',
-                icon: Icons.south,
-              ),
-              MetricCard(
-                label: 'Upload',
-                value: '${service.networkUpMbps.toStringAsFixed(1)} Mbps',
-                icon: Icons.north,
-              ),
-            ],
-          ),
-          const SectionTitle('Runtime'),
+  Widget build(BuildContext context) {
+    final valueUnavailable = loading ? '…' : '—';
+    final hasMetrics = service.metricsAvailable;
+    final updatedAt = service.metricsUpdatedAt;
+    final stale = updatedAt != null &&
+        DateTime.now().difference(updatedAt.toLocal()) >
+            const Duration(minutes: 5);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (loading) const LinearProgressIndicator(minHeight: 2),
+        if (!loading && (!hasMetrics || stale || error)) ...[
           Card(
-            child: Column(
-              children: [
-                ListTile(
-                    title: const Text('Type'),
-                    trailing: Text(service.kind.name)),
-                ListTile(
-                  title: const Text('Image'),
-                  subtitle: Text(
-                      service.image.isEmpty ? 'Not reported' : service.image),
-                ),
-                if (service.domain.isNotEmpty)
-                  ListTile(
-                      title: const Text('Domain'),
-                      subtitle: Text(service.domain)),
-              ],
+            child: ListTile(
+              leading: Icon(
+                error ? Icons.sync_problem : Icons.monitor_heart_outlined,
+              ),
+              title: Text(
+                error
+                    ? 'Could not refresh container metrics'
+                    : !hasMetrics
+                        ? 'Container metrics are unavailable'
+                        : 'The latest sample is stale',
+              ),
+              subtitle: Text(
+                updatedAt == null
+                    ? 'Dokploy has not returned a sample for this container.'
+                    : 'Last sample ${_relativeTime(updatedAt)}',
+              ),
+              trailing: IconButton(
+                tooltip: 'Refresh',
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh),
+              ),
             ),
           ),
+          const SizedBox(height: 10),
         ],
-      );
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          // A fixed vertical extent keeps the icon, value and label visible on
+          // compact iPhones instead of shrinking cards as the width narrows.
+          mainAxisExtent: 150,
+          children: [
+            MetricCard(
+              label: 'CPU',
+              value: hasMetrics
+                  ? '${service.cpu.toStringAsFixed(1)}%'
+                  : valueUnavailable,
+              icon: Icons.memory,
+            ),
+            MetricCard(
+              label: 'Memory',
+              value: hasMetrics
+                  ? _formatMegabytes(service.memoryMb)
+                  : valueUnavailable,
+              icon: Icons.storage,
+            ),
+            MetricCard(
+              label: 'Received',
+              value: hasMetrics
+                  ? _formatMegabytes(service.networkReceivedMb)
+                  : valueUnavailable,
+              icon: Icons.south,
+            ),
+            MetricCard(
+              label: 'Sent',
+              value: hasMetrics
+                  ? _formatMegabytes(service.networkSentMb)
+                  : valueUnavailable,
+              icon: Icons.north,
+            ),
+          ],
+        ),
+        const SectionTitle('Runtime'),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                  title: const Text('Type'), trailing: Text(service.kind.name)),
+              ListTile(
+                title: const Text('Image'),
+                subtitle: Text(
+                    service.image.isEmpty ? 'Not reported' : service.image),
+              ),
+              if (service.domain.isNotEmpty)
+                ListTile(
+                    title: const Text('Domain'),
+                    subtitle: Text(service.domain)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatMegabytes(double value) {
+  if (value >= 1024) return '${(value / 1024).toStringAsFixed(2)} GB';
+  if (value >= 1) return '${value.toStringAsFixed(1)} MB';
+  return '${(value * 1024).toStringAsFixed(1)} KB';
+}
+
+String _relativeTime(DateTime timestamp) {
+  final local = timestamp.toLocal();
+  final difference = DateTime.now().difference(local);
+  if (difference.isNegative || difference.inMinutes < 1) return 'just now';
+  if (difference.inMinutes < 60) return '${difference.inMinutes} min ago';
+  if (difference.inHours < 24) return '${difference.inHours} hr ago';
+  return '${difference.inDays} days ago';
 }
 
 class _Logs extends ConsumerStatefulWidget {

@@ -5,6 +5,7 @@ abstract interface class DokployRepository {
   Future<DashboardSnapshot> dashboard();
   Future<List<ProjectModel>> projects();
   Future<List<ServiceModel>> services();
+  Future<ServiceModel> serviceDetails(ServiceModel service);
   Future<List<DeploymentModel>> deployments();
   Future<List<ServerModel>> servers();
   Future<List<BackupModel>> backups();
@@ -16,4 +17,6 @@ abstract interface class DokployRepository {
   Future<void> stop(ServiceModel service);
   Future<void> redeploy(ServiceModel service);
   Future<void> cancelDeployment(String deploymentId);
+  Future<void> setupMonitoring({String? serverId});
+  Future<void> pruneDocker({String? serverId});
 }
