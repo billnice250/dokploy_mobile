@@ -123,6 +123,50 @@ class GlassPanel extends StatelessWidget {
   }
 }
 
+class UpcomingBadge extends StatelessWidget {
+  const UpcomingBadge({super.key, this.label = 'Upcoming'});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: DokployTheme.info.withValues(alpha: .11),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: DokployTheme.info.withValues(alpha: .3)),
+        ),
+        child: Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: DokployTheme.info,
+            fontSize: 9,
+            letterSpacing: .55,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+}
+
+class DokployBrandMark extends StatelessWidget {
+  const DokployBrandMark({super.key, this.size = 30, this.radius = 8});
+
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.asset(
+          'assets/branding/dokploy-mark.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+        ),
+      );
+}
+
 class ProgressMetric extends StatelessWidget {
   const ProgressMetric({
     super.key,

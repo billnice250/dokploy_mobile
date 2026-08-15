@@ -1,4 +1,4 @@
-package com.example.dokploy_mobile
+package it.billnice.dokploymobile
 
 import io.flutter.embedding.android.FlutterActivity
 

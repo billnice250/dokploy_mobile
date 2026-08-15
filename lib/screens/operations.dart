@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../core/widgets.dart';
 import '../core/theme.dart';
-import '../domain/models.dart';
 
 class OperationsScreen extends ConsumerWidget {
   const OperationsScreen({super.key});
   @override
   Widget build(BuildContext c, WidgetRef ref) {
-    final capabilities =
-        ref.watch(capabilitiesProvider).valueOrNull ?? const CapabilitySet();
+    final demo = ref.watch(currentInstanceProvider).demo;
     return Scaffold(
         appBar: AppBar(title: const Text('Operations')),
         body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -20,26 +19,32 @@ class OperationsScreen extends ConsumerWidget {
               Icons.backup_outlined,
               'Backups',
               'Database, volume and control-plane backups',
-              capabilities.backups ? () => _showBackups(c, ref) : null),
+              demo ? () => _showBackups(c, ref) : null,
+              upcoming: !demo),
           _nav(
               Icons.schedule,
               'Scheduled jobs',
               'Cron jobs, run history and logs',
-              capabilities.schedules ? () => _showSchedules(c, ref) : null),
+              demo ? () => _showSchedules(c, ref) : null,
+              upcoming: !demo),
           _nav(Icons.language, 'Domains', 'Routes, HTTPS and target ports',
-              capabilities.domains ? () => _showDomains(c, ref) : null),
+              demo ? () => _showDomains(c, ref) : null,
+              upcoming: !demo),
           _nav(Icons.storage, 'Databases',
-              'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', null),
+              'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', null,
+              upcoming: true),
           const SectionTitle('Power tools'),
+          _nav(Icons.terminal, 'Terminal',
+              'Application / Compose / database shell (capability gated)', null,
+              upcoming: true),
           _nav(
-              Icons.terminal,
-              'Terminal',
-              'Application / Compose / database shell (capability gated)',
-              capabilities.terminal ? () {} : null),
-          _nav(Icons.notifications_active_outlined, 'Notifications',
-              'Deployment failures, backup failures and health alerts', null),
+              Icons.notifications_active_outlined,
+              'Notifications',
+              'Deployment changes and local notification history',
+              () => c.push('/notifications')),
           _nav(Icons.widgets_outlined, 'Widgets & shortcuts',
-              'Home-screen health and quick actions', null),
+              'Home-screen health and quick actions', null,
+              upcoming: true),
         ]));
   }
 
@@ -60,15 +65,19 @@ class OperationsScreen extends ConsumerWidget {
                 'Fast access to operational workflows designed for a phone.',
                 style: TextStyle(color: DokployTheme.muted))
           ])));
-  Widget _nav(IconData i, String t, String s, VoidCallback? onTap) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Card(
-          child: ListTile(
-              onTap: onTap,
-              leading: Icon(i),
-              title: Text(t),
-              subtitle: Text(s),
-              trailing: const Icon(Icons.chevron_right))));
+  Widget _nav(IconData i, String t, String s, VoidCallback? onTap,
+          {bool upcoming = false}) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Card(
+              child: ListTile(
+                  onTap: onTap,
+                  leading: Icon(i),
+                  title: Text(t),
+                  subtitle: Text(s),
+                  trailing: upcoming
+                      ? const UpcomingBadge()
+                      : const Icon(Icons.chevron_right))));
   void _showBackups(BuildContext c, WidgetRef ref) {
     final x = ref.read(backupsProvider);
     _sheet(

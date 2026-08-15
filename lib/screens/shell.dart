@@ -18,57 +18,68 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        extendBody: true,
-        body: navigationShell,
-        bottomNavigationBar: SafeArea(
-          minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: Container(
-                height: 68,
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xD9202024),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            navigationShell,
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 10,
+              child: SafeArea(
+                top: false,
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: .14),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: .42),
-                      blurRadius: 28,
-                      offset: const Offset(0, 12),
-                    ),
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: .035),
-                      blurRadius: 8,
-                      offset: const Offset(0, -1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    for (var index = 0; index < _destinations.length; index++)
-                      Expanded(
-                        child: _GlassDestination(
-                          icon: _destinations[index].$1,
-                          selectedIcon: _destinations[index].$2,
-                          label: _destinations[index].$3,
-                          selected: navigationShell.currentIndex == index,
-                          onTap: () => navigationShell.goBranch(
-                            index,
-                            initialLocation:
-                                index == navigationShell.currentIndex,
-                          ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                    child: Container(
+                      height: 68,
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xD9202024),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: .14),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .42),
+                            blurRadius: 28,
+                            offset: const Offset(0, 12),
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: .035),
+                            blurRadius: 8,
+                            offset: const Offset(0, -1),
+                          ),
+                        ],
                       ),
-                  ],
+                      child: Row(
+                        children: [
+                          for (var index = 0;
+                              index < _destinations.length;
+                              index++)
+                            Expanded(
+                              child: _GlassDestination(
+                                icon: _destinations[index].$1,
+                                selectedIcon: _destinations[index].$2,
+                                label: _destinations[index].$3,
+                                selected: navigationShell.currentIndex == index,
+                                onTap: () => navigationShell.goBranch(
+                                  index,
+                                  initialLocation:
+                                      index == navigationShell.currentIndex,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       );
 }

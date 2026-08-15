@@ -155,6 +155,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
               title: Text('Terminal'),
               subtitle:
                   Text('Unavailable until the server capability is verified'),
+              trailing: UpcomingBadge(),
             ),
           ],
         ),

@@ -25,25 +25,7 @@ class DashboardScreen extends ConsumerWidget {
         backgroundColor: DokployTheme.bg.withValues(alpha: .72),
         title: Row(
           children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: DokployTheme.primary,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: .12),
-                    blurRadius: 18,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.hexagon_outlined,
-                size: 18,
-                color: DokployTheme.onPrimary,
-              ),
-            ),
+            const DokployBrandMark(),
             const SizedBox(width: 10),
             const Text('Dokploy'),
           ],

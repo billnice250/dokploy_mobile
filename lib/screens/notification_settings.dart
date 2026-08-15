@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/local_notifications.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../core/widgets.dart';
 import '../domain/notifications.dart';
 
 class NotificationSettingsScreen extends ConsumerWidget {
@@ -59,7 +60,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
                   RadioGroup<NotificationDeliveryMode>(
                     groupValue: preferences.deliveryMode,
                     onChanged: (mode) {
-                      if (mode != null) {
+                      if (mode == NotificationDeliveryMode.polling) {
                         _save(ref, instance.id,
                             preferences.copyWith(deliveryMode: mode));
                       }
@@ -74,7 +75,13 @@ class NotificationSettingsScreen extends ConsumerWidget {
                         ),
                         RadioListTile(
                           value: NotificationDeliveryMode.push,
-                          title: Text('Reliable push'),
+                          enabled: false,
+                          title: Row(
+                            children: [
+                              Expanded(child: Text('Reliable push')),
+                              UpcomingBadge(),
+                            ],
+                          ),
                           subtitle:
                               Text('Requires the optional Dokploy relay.'),
                         ),
