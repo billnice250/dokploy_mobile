@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/instance_store.dart';
 import '../data/mock_repository.dart';
+import '../data/notification_store.dart';
 import '../data/repository.dart';
 import '../domain/models.dart';
+import '../domain/notifications.dart';
 
 const demoInstance = DokployInstance(
   id: 'demo',
@@ -50,4 +52,17 @@ final schedulesProvider = FutureProvider(
 );
 final domainsProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).domains(),
+);
+
+final notificationStoreProvider =
+    Provider<NotificationStore>((ref) => const NotificationStore());
+final notificationPreferencesProvider =
+    FutureProvider.family<NotificationPreferences, String>(
+  (ref, instanceId) =>
+      ref.watch(notificationStoreProvider).preferences(instanceId),
+);
+final notificationHistoryProvider =
+    FutureProvider.family<List<NotificationEvent>, String>(
+  (ref, instanceId) =>
+      ref.watch(notificationStoreProvider).history(instanceId: instanceId),
 );

@@ -51,7 +51,7 @@ class ServersScreen extends ConsumerWidget {
                 ),
               )
             : ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 112),
                 children: [
                   for (final server in items)
                     Padding(

@@ -43,6 +43,22 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('glass navigation fits on a narrow phone', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const ProviderScope(child: DokployMobileApp()),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Projects'), findsWidgets);
+    expect(find.text('Activity'), findsWidgets);
+    expect(find.text('Servers'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _NoMetricsRepository extends MockDokployRepository {

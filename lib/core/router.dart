@@ -8,6 +8,8 @@ import '../screens/service_detail.dart';
 import '../screens/operations.dart';
 import '../screens/settings.dart';
 import '../screens/deployment_detail.dart';
+import '../screens/notifications.dart';
+import '../screens/notification_settings.dart';
 
 final router = GoRouter(initialLocation: '/', routes: [
   StatefulShellRoute.indexedStack(
@@ -39,4 +41,9 @@ final router = GoRouter(initialLocation: '/', routes: [
           )),
   GoRoute(path: '/operations', builder: (c, s) => const OperationsScreen()),
   GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
+  GoRoute(
+      path: '/notifications', builder: (c, s) => const NotificationsScreen()),
+  GoRoute(
+      path: '/notification-settings',
+      builder: (c, s) => const NotificationSettingsScreen()),
 ]);

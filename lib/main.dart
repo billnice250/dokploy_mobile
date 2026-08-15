@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/providers.dart';
+import 'core/local_notifications.dart';
 import 'data/dokploy_api.dart';
 import 'data/instance_store.dart';
 import 'data/real_repository.dart';
@@ -11,6 +12,7 @@ import 'domain/models.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LocalNotificationService.instance.initialize();
   final bootstrap = await _restoreActiveInstance();
   runApp(
     ProviderScope(

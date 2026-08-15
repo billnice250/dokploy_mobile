@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../core/theme.dart';
@@ -60,6 +61,22 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () => _add(context, ref),
             icon: const Icon(Icons.add),
             label: const Text('Add Dokploy instance'),
+          ),
+          const SizedBox(height: 26),
+          const Text(
+            'Notifications',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              onTap: () => context.push('/notification-settings'),
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Deployment alerts'),
+              subtitle: const Text(
+                  'Polling, quiet hours, event rules and push readiness'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+            ),
           ),
           const SizedBox(height: 26),
           const Text(

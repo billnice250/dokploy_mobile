@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last audited: 14 August 2026.
+Last audited: 15 August 2026.
 
 This document describes the code that exists today. It deliberately does not count a screen placeholder as a working feature.
 
@@ -20,6 +20,9 @@ This document describes the code that exists today. It deliberately does not cou
   Dokploy 401/403 responses for `server.all` do not break project or deployment
   views authenticated by the same otherwise-valid token.
 - Map HTTP, connectivity, timeout, and TLS failures into app-owned failure categories.
+- Maintain a per-instance notification center, poll deployment transitions while
+  the app is active, apply quiet hours/event rules, and open deployment deep
+  links from local notifications.
 
 These paths use the real `DokployApi` through `RealDokployRepository`; widgets do not call Dio.
 
@@ -51,13 +54,16 @@ The real repository returns empty backup, schedule, and domain collections until
 - Capabilities: `user.getPermissions` is cached per active connection and gates
   optional reads and actions. Version discovery and endpoint-level compatibility
   probing beyond that permission map are not implemented.
+- Notifications: foreground polling and local alerts work. Reliable background
+  delivery is modeled in preferences but remains unpaired until the optional
+  webhook-to-APNs/FCM relay is packaged.
 
 ## Planned / unavailable
 
 - Real backups, schedules, domains, and full database management.
 - Compose service inspection and terminal sessions.
 - Biometrics, app lock, screenshot protection, and clipboard auto-clear.
-- Push relay, home-screen widgets, shortcuts, and Git enrichment.
+- Push relay image, home-screen widgets, shortcuts, and Git enrichment.
 - Compatibility CI against disposable Dokploy versions.
 - Aggregated All Instances dashboard.
 
@@ -65,5 +71,6 @@ The real repository returns empty backup, schedule, and domain collections until
 
 - `dart format`: enforced on `lib/` and `test/`.
 - `flutter analyze`: clean.
-- `flutter test`: unit and widget coverage exists for demo startup and transport failure mapping.
-- Android/iOS folders exist. Platform debug builds are part of the release verification checklist.
+- `flutter test`: unit and widget coverage includes demo startup, transport
+  failure mapping, deployment transition alerts, and overnight quiet hours.
+- Android debug APK and iOS simulator builds pass with the notification plugin.

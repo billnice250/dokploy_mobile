@@ -52,7 +52,7 @@ class MockDokployRepository implements DokployRepository {
         appName: 'media-stack'),
     ServiceModel(
         id: 'a2',
-        name: 'J2534 Server',
+        name: 'Auth Server',
         kind: ServiceKind.application,
         status: HealthState.deploying,
         project: 'Production',
@@ -117,7 +117,7 @@ class MockDokployRepository implements DokployRepository {
   Future<List<DeploymentModel>> deployments() async => [
         DeploymentModel(
             id: 'd1',
-            service: 'J2534 Server',
+            service: 'Auth Server',
             serviceId: 'a2',
             status: HealthState.deploying,
             createdAt: now.subtract(const Duration(minutes: 2)),

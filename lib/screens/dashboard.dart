@@ -16,6 +16,9 @@ class DashboardScreen extends ConsumerWidget {
     final dashboard = ref.watch(dashboardProvider);
     final instance = ref.watch(currentInstanceProvider);
     final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
+    final notifications =
+        ref.watch(notificationHistoryProvider(instance.id)).valueOrNull;
+    final unread = notifications?.where((item) => !item.read).length ?? 0;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -46,6 +49,15 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => context.push('/notifications'),
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 99 ? '99+' : '$unread'),
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+          ),
           IconButton(
             tooltip: 'Operations',
             onPressed: () => context.push('/operations'),
@@ -121,7 +133,7 @@ class _DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
         children: [
           _HealthHero(snapshot: snapshot, instance: instance),
           const SizedBox(height: 14),
