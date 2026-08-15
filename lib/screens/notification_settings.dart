@@ -316,7 +316,7 @@ class _RelayCard extends StatelessWidget {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Relay not paired yet. The upcoming Docker relay will accept Dokploy webhooks and deliver reliable APNs/FCM push without storing your API key.',
+                'Relay not paired yet. The upcoming relay will accept Dokploy webhooks and deliver reliable push notifications to this device.',
                 style: TextStyle(color: DokployTheme.muted, height: 1.35),
               ),
             ),

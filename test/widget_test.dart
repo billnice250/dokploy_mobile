@@ -1,5 +1,6 @@
 import 'package:dokploy_mobile/app.dart';
 import 'package:dokploy_mobile/core/providers.dart';
+import 'package:dokploy_mobile/core/router.dart';
 import 'package:dokploy_mobile/data/mock_repository.dart';
 import 'package:dokploy_mobile/domain/models.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +47,11 @@ void main() {
 
   testWidgets('glass navigation fits on a narrow phone', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    router.go('/projects');
+    addTearDown(() {
+      router.go('/');
+      tester.binding.setSurfaceSize(null);
+    });
     await tester.pumpWidget(
       const ProviderScope(child: DokployMobileApp()),
     );
