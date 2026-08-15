@@ -13,3 +13,7 @@ ios/Pods/
 .env
 *.log
 .env.secret
+*.DS_Store
+**/.DS_Store
+lib/.DS_Store
+.DS_Store
