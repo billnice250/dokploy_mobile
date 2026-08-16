@@ -20,6 +20,8 @@
 		<false/>
 		<key>NSFaceIDUsageDescription</key>
 		<string>DployGo uses Face ID to confirm sensitive server operations.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>DployGo needs access to your photo library when you choose an image or file to import into the app.</string>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
