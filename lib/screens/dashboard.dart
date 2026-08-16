@@ -27,7 +27,7 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             const DokployBrandMark(),
             const SizedBox(width: 10),
-            const Text('Dokploy'),
+            const Text('DployGo'),
           ],
         ),
         actions: [
@@ -403,7 +403,7 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(right: 10),
         child: SizedBox(
-          width: 108,
+          width: 120,
           child: GlassPanel(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             onTap: onTap,

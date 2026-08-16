@@ -11,7 +11,10 @@ import '../screens/deployment_detail.dart';
 import '../screens/notifications.dart';
 import '../screens/notification_settings.dart';
 
-final router = GoRouter(initialLocation: '/', routes: [
+// Let Flutter's platform route select the initial page. Normal launches still
+// start at `/`, while deep links and store-screenshot captures can open a
+// specific route without a special build of the app.
+final router = GoRouter(routes: [
   StatefulShellRoute.indexedStack(
     builder: (context, state, navigationShell) =>
         AppShell(navigationShell: navigationShell),
