@@ -128,6 +128,10 @@ class _DashboardContent extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
         children: [
+          if (instance.demo) ...[
+            const _DemoModeBanner(),
+            const SizedBox(height: 14),
+          ],
           _HealthHero(snapshot: snapshot, instance: instance),
           const SizedBox(height: 14),
           _StatusStrip(snapshot),
@@ -205,6 +209,71 @@ class _DashboardContent extends StatelessWidget {
       );
 }
 
+class _DemoModeBanner extends StatelessWidget {
+  const _DemoModeBanner();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              DokployTheme.warning.withValues(alpha: .18),
+              DokployTheme.panel,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: DokployTheme.warning.withValues(alpha: .55),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: DokployTheme.warning.withValues(alpha: .08),
+              blurRadius: 24,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.science_outlined, color: DokployTheme.warning),
+                SizedBox(width: 9),
+                Text(
+                  'DEMO MODE',
+                  style: TextStyle(
+                    color: DokployTheme.warning,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'You’re viewing sample infrastructure',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Connect a real Dokploy server to see your projects, live containers, metrics and deployments.',
+              style: TextStyle(color: DokployTheme.muted, height: 1.35),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () => context.push('/settings'),
+              icon: const Icon(Icons.add_link_rounded),
+              label: const Text('Add a real server'),
+            ),
+          ],
+        ),
+      );
+}
+
 List<ServerModel> _mergeServers(
   List<ServerModel> inventory,
   ServerModel? live,
@@ -254,9 +323,11 @@ class _HealthHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      healthy
-                          ? 'Everything looks good'
-                          : '${snapshot.attention.length + snapshot.failed} item(s) need attention',
+                      instance.demo
+                          ? 'Explore DployGo safely'
+                          : healthy
+                              ? 'Everything looks good'
+                              : '${snapshot.attention.length + snapshot.failed} item(s) need attention',
                       style:
                           Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.w700,

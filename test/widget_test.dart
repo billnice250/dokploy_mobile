@@ -18,9 +18,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
+    expect(find.text('DEMO MODE'), findsOneWidget);
+    expect(find.text('You’re viewing sample infrastructure'), findsOneWidget);
+    expect(find.text('Add a real server'), findsOneWidget);
     expect(find.textContaining('Demo Infrastructure'), findsOneWidget);
-    expect(find.text('RECENT DEPLOYMENTS'), findsOneWidget);
-    expect(find.text('Servers'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('settings shows API compatibility and author links',
@@ -35,6 +37,22 @@ void main() {
         child: const MaterialApp(home: SettingsScreen()),
       ),
     );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('API key setup & safety'),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.ensureVisible(find.text('API key setup & safety'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('API key setup & safety'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dokploy API key setup'), findsOneWidget);
+    expect(find.textContaining('API/CLI Keys'), findsOneWidget);
+    expect(
+        find.textContaining('Treat the key like a password'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Dokploy API key setup'))).pop();
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(

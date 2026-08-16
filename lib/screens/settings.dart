@@ -91,19 +91,29 @@ class SettingsScreen extends ConsumerWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          const Card(
+          Card(
             child: Column(
               children: [
-                ListTile(
+                const ListTile(
                   leading: Icon(Icons.https_outlined),
                   title: Text('HTTPS required'),
                   subtitle: Text(
                       'Invalid TLS certificates are never accepted globally.'),
                 ),
-                ListTile(
+                const ListTile(
                   leading: Icon(Icons.key),
                   title: Text('API keys'),
                   subtitle: Text('Stored only in Keychain / Android Keystore'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  onTap: () => _showApiKeyGuide(context),
+                  leading: const Icon(Icons.help_outline_rounded),
+                  title: const Text('API key setup & safety'),
+                  subtitle: const Text(
+                    'How to create, protect and revoke a Dokploy key',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
                 ),
               ],
             ),
@@ -346,118 +356,136 @@ class SettingsScreen extends ConsumerWidget {
             16,
             MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Add Dokploy instance',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Name')),
-              const SizedBox(height: 10),
-              TextField(
-                controller: url,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'HTTPS URL',
-                  hintText: 'https://dokploy.example.com',
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Add Dokploy instance',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: key,
-                obscureText: true,
-                enableSuggestions: false,
-                autocorrect: false,
-                decoration: const InputDecoration(labelText: 'API key'),
-              ),
-              if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(error!,
-                      style: const TextStyle(color: DokployTheme.danger)),
+                const SizedBox(height: 16),
+                TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Name')),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: url,
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'HTTPS URL',
+                    hintText: 'https://dokploy.example.com',
+                  ),
                 ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: busy
-                    ? null
-                    : () async {
-                        var normalized = url.text.trim();
-                        while (normalized.endsWith('/')) {
-                          normalized = normalized.substring(
-                            0,
-                            normalized.length - 1,
-                          );
-                        }
-                        final uri = Uri.tryParse(normalized);
-                        if (uri == null ||
-                            uri.scheme != 'https' ||
-                            uri.host.isEmpty ||
-                            key.text.trim().isEmpty) {
-                          setLocalState(
-                            () =>
-                                error = 'Enter a valid HTTPS URL and API key.',
-                          );
-                          return;
-                        }
-                        setLocalState(() {
-                          busy = true;
-                          error = null;
-                        });
-                        try {
-                          final api = DokployApi(
-                            baseUrl: normalized,
-                            apiKey: key.text.trim(),
-                          );
-                          await api.projects();
-                          final instance = DokployInstance(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            name: name.text.trim().isEmpty
-                                ? uri.host
-                                : name.text.trim(),
-                            baseUrl: normalized,
-                          );
-                          await ref
-                              .read(instanceStoreProvider)
-                              .save(instance, key.text.trim());
-                          ref.read(currentInstanceProvider.notifier).state =
-                              instance;
-                          ref.read(repositoryProvider.notifier).state =
-                              RealDokployRepository(api);
-                          ref.invalidate(instancesProvider);
-                          _invalidateData(ref);
-                          if (sheetContext.mounted) Navigator.pop(sheetContext);
-                          if (context.mounted) {
-                            DployGoNotice.show(
-                              context,
-                              message: 'Dokploy instance connected.',
-                              tone: DployGoNoticeTone.success,
+                const SizedBox(height: 10),
+                TextField(
+                  controller: key,
+                  obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: const InputDecoration(labelText: 'API key'),
+                ),
+                const SizedBox(height: 10),
+                const Card(
+                  child: ExpansionTile(
+                    leading: Icon(Icons.key_outlined),
+                    title: Text('How do I get an API key?'),
+                    subtitle: Text('Portal steps and security notes'),
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: _ApiKeyGuideContent(compact: true),
+                      ),
+                    ],
+                  ),
+                ),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(error!,
+                        style: const TextStyle(color: DokployTheme.danger)),
+                  ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          var normalized = url.text.trim();
+                          while (normalized.endsWith('/')) {
+                            normalized = normalized.substring(
+                              0,
+                              normalized.length - 1,
                             );
                           }
-                        } catch (failure) {
+                          final uri = Uri.tryParse(normalized);
+                          if (uri == null ||
+                              uri.scheme != 'https' ||
+                              uri.host.isEmpty ||
+                              key.text.trim().isEmpty) {
+                            setLocalState(
+                              () => error =
+                                  'Enter a valid HTTPS URL and API key.',
+                            );
+                            return;
+                          }
                           setLocalState(() {
-                            busy = false;
-                            error = 'Connection failed: $failure';
+                            busy = true;
+                            error = null;
                           });
-                        }
-                      },
-                icon: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.link),
-                label: Text(busy ? 'Testing…' : 'Test & save'),
-              ),
-            ],
+                          try {
+                            final api = DokployApi(
+                              baseUrl: normalized,
+                              apiKey: key.text.trim(),
+                            );
+                            await api.projects();
+                            final instance = DokployInstance(
+                              id: DateTime.now()
+                                  .microsecondsSinceEpoch
+                                  .toString(),
+                              name: name.text.trim().isEmpty
+                                  ? uri.host
+                                  : name.text.trim(),
+                              baseUrl: normalized,
+                            );
+                            await ref
+                                .read(instanceStoreProvider)
+                                .save(instance, key.text.trim());
+                            ref.read(currentInstanceProvider.notifier).state =
+                                instance;
+                            ref.read(repositoryProvider.notifier).state =
+                                RealDokployRepository(api);
+                            ref.invalidate(instancesProvider);
+                            _invalidateData(ref);
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                            if (context.mounted) {
+                              DployGoNotice.show(
+                                context,
+                                message: 'Dokploy instance connected.',
+                                tone: DployGoNoticeTone.success,
+                              );
+                            }
+                          } catch (failure) {
+                            setLocalState(() {
+                              busy = false;
+                              error = 'Connection failed: $failure';
+                            });
+                          }
+                        },
+                  icon: busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.link),
+                  label: Text(busy ? 'Testing…' : 'Test & save'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -478,4 +506,183 @@ class SettingsScreen extends ConsumerWidget {
     ref.invalidate(schedulesProvider);
     ref.invalidate(domainsProvider);
   }
+
+  Future<void> _showApiKeyGuide(BuildContext context) =>
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (sheetContext) => const SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dokploy API key setup',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
+                SizedBox(height: 16),
+                _ApiKeyGuideContent(),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _ApiKeyGuideContent extends StatelessWidget {
+  const _ApiKeyGuideContent({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _GuideStep(
+            number: 1,
+            text: 'Sign in to your Dokploy web dashboard.',
+            compact: compact,
+          ),
+          _GuideStep(
+            number: 2,
+            text: 'Open Profile, then find API/CLI Keys.',
+            compact: compact,
+          ),
+          _GuideStep(
+            number: 3,
+            text:
+                'Choose Generate New Key and give it a recognizable name, such as “DployGo Mobile”.',
+            compact: compact,
+          ),
+          _GuideStep(
+            number: 4,
+            text: 'Copy the key when it is shown and paste it into DployGo.',
+            compact: compact,
+          ),
+          SizedBox(height: compact ? 8 : 14),
+          Container(
+            padding: EdgeInsets.all(compact ? 10 : 14),
+            decoration: BoxDecoration(
+              color: DokployTheme.warning.withValues(alpha: .10),
+              border: Border.all(
+                color: DokployTheme.warning.withValues(alpha: .38),
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.shield_outlined,
+                  color: DokployTheme.warning,
+                  size: 20,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Treat the key like a password. It acts with the permissions of its Dokploy account. Do not share it, paste it into issue reports, or commit it to source control.',
+                    style: TextStyle(height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: compact ? 10 : 14),
+          const _SafetyPoint(
+            icon: Icons.lock_outline_rounded,
+            text:
+                'Stored locally in iOS Keychain or Android Keystore-backed secure storage.',
+          ),
+          const _SafetyPoint(
+            icon: Icons.cloud_outlined,
+            text:
+                'Sent only to the HTTPS Dokploy URL you configure, using the x-api-key header.',
+          ),
+          const _SafetyPoint(
+            icon: Icons.visibility_off_outlined,
+            text:
+                'Redacted from DployGo request logs and never included in notifications.',
+          ),
+          const _SafetyPoint(
+            icon: Icons.delete_outline_rounded,
+            text:
+                'Removing an instance deletes its saved key from this device.',
+          ),
+          const _SafetyPoint(
+            icon: Icons.block_outlined,
+            text:
+                'If the device or key may be compromised, delete the key in Dokploy immediately and generate a replacement.',
+          ),
+        ],
+      );
+}
+
+class _GuideStep extends StatelessWidget {
+  const _GuideStep({
+    required this.number,
+    required this.text,
+    required this.compact,
+  });
+
+  final int number;
+  final String text;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(bottom: compact ? 7 : 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: compact ? 22 : 26,
+              height: compact ? 22 : 26,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: DokployTheme.elevated,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$number',
+                style: TextStyle(
+                  fontSize: compact ? 11 : 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text, style: const TextStyle(height: 1.35))),
+          ],
+        ),
+      );
+}
+
+class _SafetyPoint extends StatelessWidget {
+  const _SafetyPoint({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 9),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: DokployTheme.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: DokployTheme.muted,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }
