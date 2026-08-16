@@ -126,6 +126,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('fresh container metrics replace a stale stopped status',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => _LiveStatusRepository()),
+        ],
+        child: const MaterialApp(
+          home: ServiceDetailScreen(serviceId: 'ollama'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Healthy'), findsOneWidget);
+    expect(find.text('Stopped'), findsNothing);
+  });
+
   testWidgets('sensitive service mutation requires biometric confirmation',
       (tester) async {
     final repository = _SensitiveRepository();
@@ -219,6 +237,34 @@ class _MetricRepository extends MockDokployRepository {
         networkSentMb: 3.73,
         metricsAvailable: true,
         metricsUpdatedAt: DateTime.utc(2026, 6, 18, 9, 22),
+      );
+}
+
+class _LiveStatusRepository extends MockDokployRepository {
+  static const stopped = ServiceModel(
+    id: 'ollama',
+    name: 'ollama',
+    kind: ServiceKind.application,
+    status: HealthState.stopped,
+    appName: 'internal-applications-ollama-mx5teo',
+    metricsAvailable: false,
+  );
+
+  @override
+  Future<List<ServiceModel>> services() async => const [stopped];
+
+  @override
+  Future<ServiceModel> serviceDetails(ServiceModel service) async => service;
+
+  @override
+  Stream<ServiceModel> watchServiceMetrics(ServiceModel service) =>
+      Stream.value(
+        service.copyWith(
+          status: HealthState.healthy,
+          cpu: 12,
+          metricsAvailable: true,
+          metricsUpdatedAt: DateTime.now(),
+        ),
       );
 }
 

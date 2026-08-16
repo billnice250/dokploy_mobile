@@ -120,6 +120,30 @@ void main() {
     expect(logs, ['building', 'deploying', 'done']);
   });
 
+  test('maps a running deployment as deploying, not healthy', () async {
+    final repository = RealDokployRepository(
+      _FakeApi(
+        permissionPayload: const {
+          'deployment': {'read': true},
+        },
+        deploymentPayload: const [
+          {
+            'deploymentId': 'active-deployment',
+            'status': 'running',
+            'createdAt': '2026-08-16T10:00:00.000Z',
+            'startedAt': '2026-08-16T10:00:01.000Z',
+            'applicationId': 'application-1',
+          },
+        ],
+      ),
+    );
+
+    final deployment = (await repository.deployments()).single;
+
+    expect(deployment.status, HealthState.deploying);
+    expect(deployment.finishedAt, isNull);
+  });
+
   test('enriches server inventory with the latest monitoring sample', () async {
     final repository = RealDokployRepository(
       _FakeApi(

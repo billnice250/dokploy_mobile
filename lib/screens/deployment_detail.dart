@@ -30,6 +30,8 @@ class _DeploymentDetailScreenState
   int _tail = 500;
   String _search = '';
   bool _autoRefresh = false;
+  bool _followingActiveDeployment = false;
+  HealthState? _lastObservedStatus;
 
   @override
   void dispose() {
@@ -51,18 +53,47 @@ class _DeploymentDetailScreenState
 
   void _reload() => setState(() => _logsRequest = _loadLogs());
 
-  void _toggleAutoRefresh() {
-    setState(() => _autoRefresh = !_autoRefresh);
+  void _setAutoRefresh(bool enabled) {
+    if (_autoRefresh == enabled) return;
+    setState(() => _autoRefresh = enabled);
     _refreshTimer?.cancel();
-    if (_autoRefresh) {
-      _reload();
+    if (enabled) {
+      _refreshDeploymentAndLogs();
       _refreshTimer = Timer.periodic(
         const Duration(seconds: 3),
         (_) {
-          if (mounted) _reload();
+          if (mounted) _refreshDeploymentAndLogs();
         },
       );
     }
+  }
+
+  void _toggleAutoRefresh() {
+    _followingActiveDeployment = false;
+    _setAutoRefresh(!_autoRefresh);
+  }
+
+  void _refreshDeploymentAndLogs() {
+    ref.invalidate(deploymentsProvider);
+    _reload();
+  }
+
+  void _observeStatus(HealthState status) {
+    if (_lastObservedStatus == status) return;
+    final previous = _lastObservedStatus;
+    _lastObservedStatus = status;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (status == HealthState.deploying) {
+        _followingActiveDeployment = true;
+        _setAutoRefresh(true);
+      } else if (_followingActiveDeployment &&
+          previous == HealthState.deploying) {
+        _followingActiveDeployment = false;
+        _setAutoRefresh(false);
+        _refreshDeploymentAndLogs();
+      }
+    });
   }
 
   void _scrollToBottom() {
@@ -80,6 +111,7 @@ class _DeploymentDetailScreenState
     final deployment = deployments.valueOrNull
         ?.where((item) => item.id == widget.deploymentId)
         .firstOrNull;
+    if (deployment != null) _observeStatus(deployment.status);
     _logsRequest ??= _loadLogs();
 
     return Scaffold(
@@ -89,8 +121,7 @@ class _DeploymentDetailScreenState
           IconButton(
             tooltip: 'Refresh deployment',
             onPressed: () {
-              ref.invalidate(deploymentsProvider);
-              _reload();
+              _refreshDeploymentAndLogs();
             },
             icon: const Icon(Icons.refresh),
           ),

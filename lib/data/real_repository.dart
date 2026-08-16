@@ -128,6 +128,58 @@ class RealDokployRepository implements DokployRepository {
     return HealthState.unknown;
   }
 
+  HealthState _deploymentState(dynamic value) {
+    final status = '$value'.toLowerCase();
+    if (status.contains('run') ||
+        status.contains('deploy') ||
+        status.contains('queue') ||
+        status.contains('progress') ||
+        status.contains('pending')) {
+      return HealthState.deploying;
+    }
+    if (status.contains('done') ||
+        status.contains('success') ||
+        status.contains('complete')) {
+      return HealthState.healthy;
+    }
+    if (status.contains('fail') || status.contains('error')) {
+      return HealthState.failed;
+    }
+    if (status.contains('cancel') || status.contains('stop')) {
+      return HealthState.stopped;
+    }
+    return HealthState.unknown;
+  }
+
+  HealthState _serviceState(dynamic value) {
+    final status = '$value'.toLowerCase();
+    // applicationStatus/composeStatus describe the deployment operation, not
+    // Docker health. Dokploy uses `running` while that operation is active.
+    if (status.contains('run') ||
+        status.contains('deploy') ||
+        status.contains('queue') ||
+        status.contains('progress') ||
+        status.contains('pending')) {
+      return HealthState.deploying;
+    }
+    if (status.contains('done') ||
+        status.contains('success') ||
+        status.contains('complete') ||
+        status == 'active' ||
+        status.contains('healthy')) {
+      return HealthState.healthy;
+    }
+    if (status.contains('fail') || status.contains('error')) {
+      return HealthState.failed;
+    }
+    if (status.contains('stop') ||
+        status.contains('idle') ||
+        status == 'inactive') {
+      return HealthState.stopped;
+    }
+    return HealthState.unknown;
+  }
+
   @override
   Future<List<ProjectModel>> projects() async =>
       _list(await _projectHierarchy()).whereType<Map>().map((project) {
@@ -190,7 +242,7 @@ class RealDokployRepository implements DokployRepository {
           id: _s(m, ['deploymentId', 'id']),
           service: _deploymentService(m),
           serviceId: _deploymentServiceId(m),
-          status: _state(m['status']),
+          status: _deploymentState(m['status']),
           createdAt: DateTime.tryParse(_s(m, ['createdAt'])) ?? DateTime.now(),
           startedAt: startedAt,
           finishedAt: finishedAt,
@@ -494,7 +546,7 @@ class RealDokployRepository implements DokployRepository {
                 id: _s(service, [_idKey(kind), 'id']),
                 name: _s(service, ['name', 'appName'], 'Service'),
                 kind: kind,
-                status: _state(
+                status: _serviceState(
                   service[kind == ServiceKind.compose
                       ? 'composeStatus'
                       : 'applicationStatus'],
@@ -521,7 +573,7 @@ class RealDokployRepository implements DokployRepository {
           id: _s(service, ['id']),
           name: _s(service, ['name', 'appName'], 'Service'),
           kind: kind,
-          status: _state(service['status']),
+          status: _serviceState(service['status']),
           project: _s(service, ['projectName'], 'Production'),
           appName: _s(service, ['appName', 'name']),
           serverId: _s(service, ['serverId']),
@@ -550,8 +602,16 @@ class RealDokployRepository implements DokployRepository {
       if (raw is! Map) return service;
 
       final domains = _listAt(raw, 'domains');
+      final reportedStatus = _serviceState(
+        raw[service.kind == ServiceKind.compose
+            ? 'composeStatus'
+            : 'applicationStatus'],
+      );
       final detailed = service.copyWith(
         name: _s(raw, ['name'], service.name),
+        status: reportedStatus == HealthState.unknown
+            ? service.status
+            : reportedStatus,
         image: _s(raw, ['dockerImage', 'image'], service.image),
         domain: domains.isEmpty
             ? service.domain
@@ -956,6 +1016,10 @@ class RealDokployRepository implements DokployRepository {
         .whereType<DateTime>()
         .toList();
     return service.copyWith(
+      // Docker only emits this stream while the container is running. A fresh
+      // sample is therefore stronger runtime evidence than the persisted
+      // application/compose operation status.
+      status: HealthState.healthy,
       cpu: _d(cpu['value']),
       memoryMb: _toMegabytes(memoryValue['used']),
       networkReceivedMb: _d(networkValue['inputMb']),

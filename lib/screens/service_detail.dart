@@ -21,6 +21,8 @@ class ServiceDetailScreen extends ConsumerStatefulWidget {
 
 class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
   int tab = 0;
+  HealthState? _optimisticStatus;
+  DateTime? _optimisticStatusUntil;
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +41,24 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
     final detailedService = detail.valueOrNull ?? listedService;
     final liveMetrics =
         ref.watch(liveServiceMetricsProvider(detailedService)).valueOrNull;
+    final metricsUpdatedAt = liveMetrics?.metricsUpdatedAt;
+    final hasFreshRuntimeSample = liveMetrics?.metricsAvailable == true &&
+        metricsUpdatedAt != null &&
+        DateTime.now().difference(metricsUpdatedAt).abs() <
+            const Duration(seconds: 7);
+    final optimisticStatus =
+        _optimisticStatusUntil?.isAfter(DateTime.now()) == true
+            ? _optimisticStatus
+            : null;
+    final runtimeStatus = detailedService.status == HealthState.deploying
+        ? HealthState.deploying
+        : hasFreshRuntimeSample
+            ? liveMetrics!.status
+            : detailedService.status;
     final service = liveMetrics == null || !liveMetrics.metricsAvailable
-        ? detailedService
+        ? detailedService.copyWith(status: optimisticStatus ?? runtimeStatus)
         : detailedService.copyWith(
+            status: optimisticStatus ?? runtimeStatus,
             cpu: liveMetrics.cpu,
             memoryMb: liveMetrics.memoryMb,
             networkReceivedMb: liveMetrics.networkReceivedMb,
@@ -83,6 +100,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                       ? () => _runAction(
                             context,
                             'Redeploy',
+                            service,
                             () =>
                                 ref.read(repositoryProvider).redeploy(service),
                           )
@@ -144,6 +162,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                 _runAction(
                   context,
                   'Start',
+                  service,
                   () => ref.read(repositoryProvider).start(service),
                 );
               },
@@ -157,6 +176,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                 _runAction(
                   context,
                   'Redeploy',
+                  service,
                   () => ref.read(repositoryProvider).redeploy(service),
                 );
               },
@@ -214,6 +234,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
       await _runAction(
         context,
         'Stop',
+        service,
         () => ref.read(repositoryProvider).stop(service),
       );
     }
@@ -222,6 +243,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
   Future<void> _runAction(
     BuildContext context,
     String label,
+    ServiceModel service,
     Future<void> Function() action,
   ) async {
     final authorized = await confirmSensitiveOperation(
@@ -230,9 +252,18 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
       reason: 'Confirm ${label.toLowerCase()} for this service in DployGo.',
     );
     if (!authorized || !context.mounted) return;
+    setState(() {
+      _optimisticStatus =
+          label == 'Stop' ? HealthState.stopped : HealthState.deploying;
+      _optimisticStatusUntil = DateTime.now().add(const Duration(seconds: 15));
+    });
     try {
       await action();
       ref.invalidate(servicesProvider);
+      ref.invalidate(deploymentsProvider);
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(serviceDetailProvider(service));
+      ref.invalidate(liveServiceMetricsProvider(service));
       if (context.mounted) {
         DployGoNotice.show(
           context,
@@ -241,6 +272,12 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
         );
       }
     } catch (error) {
+      if (mounted) {
+        setState(() {
+          _optimisticStatus = null;
+          _optimisticStatusUntil = null;
+        });
+      }
       if (context.mounted) {
         DployGoNotice.show(
           context,
