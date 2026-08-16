@@ -10,6 +10,7 @@ Color statusColor(HealthState s) => switch (s) {
       HealthState.failed => DokployTheme.danger,
       HealthState.stopped => DokployTheme.danger,
       HealthState.deploying => DokployTheme.warning,
+      HealthState.restarting => DokployTheme.warning,
       _ => DokployTheme.muted
     };
 String statusLabel(HealthState s) =>

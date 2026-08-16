@@ -268,8 +268,11 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
     );
     if (!authorized || !context.mounted) return;
     setState(() {
-      _optimisticStatus =
-          label == 'Stop' ? HealthState.stopped : HealthState.deploying;
+      _optimisticStatus = switch (label) {
+        'Stop' => HealthState.stopped,
+        'Restart' => HealthState.restarting,
+        _ => HealthState.deploying,
+      };
       _optimisticStatusUntil = DateTime.now().add(const Duration(seconds: 15));
     });
     try {
@@ -663,8 +666,10 @@ class _Config extends ConsumerStatefulWidget {
 }
 
 class _ConfigState extends ConsumerState<_Config> {
-  final _controller = TextEditingController();
+  final List<_EnvironmentRow> _rows = [];
+  final List<String> _preservedLines = [];
   ServiceEnvironment? _environment;
+  String _originalEnvironment = '';
   Object? _error;
   bool _loading = false;
   bool _saving = false;
@@ -678,16 +683,93 @@ class _ConfigState extends ConsumerState<_Config> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _disposeRows();
     super.dispose();
   }
 
   void _hide() {
-    _controller.clear();
+    _disposeRows();
+    _preservedLines.clear();
     _environment = null;
+    _originalEnvironment = '';
     _error = null;
     _revealed = false;
   }
+
+  Future<void> _requestHide() async {
+    if (_hasChanges) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Discard environment changes?'),
+          content: const Text('Your unsaved key/value changes will be lost.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep editing'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Discard'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true || !mounted) return;
+    }
+    setState(_hide);
+  }
+
+  void _disposeRows() {
+    for (final row in _rows) {
+      row.dispose();
+    }
+    _rows.clear();
+  }
+
+  void _readEnvironment(String source) {
+    _disposeRows();
+    _preservedLines.clear();
+    for (final line in source.split('\n')) {
+      final trimmed = line.trim();
+      final separator = line.indexOf('=');
+      if (trimmed.isEmpty || trimmed.startsWith('#') || separator <= 0) {
+        if (line.isNotEmpty) _preservedLines.add(line);
+        continue;
+      }
+      final key = line.substring(0, separator).trim();
+      if (!_validEnvironmentKey(key)) {
+        _preservedLines.add(line);
+        continue;
+      }
+      _rows.add(
+        _EnvironmentRow(
+          key: key,
+          value: line.substring(separator + 1),
+        ),
+      );
+    }
+    _originalEnvironment = _serializeEnvironment();
+  }
+
+  String _serializeEnvironment() => [
+        ..._preservedLines,
+        ..._rows.map((row) => '${row.key.text.trim()}=${row.value.text}'),
+      ].join('\n');
+
+  String? get _validationMessage {
+    final seen = <String>{};
+    for (final row in _rows) {
+      final key = row.key.text.trim();
+      if (key.isEmpty) return 'Every variable needs a key.';
+      if (!_validEnvironmentKey(key)) return '“$key” is not a valid env key.';
+      if (!seen.add(key)) return 'The key “$key” is duplicated.';
+    }
+    return null;
+  }
+
+  bool get _hasChanges =>
+      _environment != null && _serializeEnvironment() != _originalEnvironment;
 
   Future<void> _reveal() async {
     final authorized = await confirmSensitiveOperation(
@@ -705,8 +787,10 @@ class _ConfigState extends ConsumerState<_Config> {
       final value =
           await ref.read(repositoryProvider).environment(widget.service);
       if (!mounted) return;
-      _controller.text = value.env;
-      setState(() => _environment = value);
+      setState(() {
+        _environment = value;
+        _readEnvironment(value.env);
+      });
     } catch (error) {
       if (mounted) setState(() => _error = error);
     } finally {
@@ -716,7 +800,7 @@ class _ConfigState extends ConsumerState<_Config> {
 
   Future<void> _save() async {
     final current = _environment;
-    if (current == null) return;
+    if (current == null || !_hasChanges || _validationMessage != null) return;
     final authorized = await confirmSensitiveOperation(
       context,
       ref,
@@ -725,12 +809,16 @@ class _ConfigState extends ConsumerState<_Config> {
     if (!authorized || !mounted) return;
     setState(() => _saving = true);
     try {
-      final updated = current.copyWith(env: _controller.text);
+      final serialized = _serializeEnvironment();
+      final updated = current.copyWith(env: serialized);
       await ref
           .read(repositoryProvider)
           .saveEnvironment(widget.service, updated);
       if (!mounted) return;
-      setState(() => _environment = updated);
+      setState(() {
+        _environment = updated;
+        _originalEnvironment = serialized;
+      });
       DployGoNotice.show(
         context,
         message: 'Environment saved. Restart or redeploy to apply it.',
@@ -783,7 +871,7 @@ class _ConfigState extends ConsumerState<_Config> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: () => setState(_hide),
+                  onPressed: _requestHide,
                   icon: const Icon(Icons.visibility_off_outlined),
                   label: const Text('Hide'),
                 ),
@@ -805,20 +893,69 @@ class _ConfigState extends ConsumerState<_Config> {
                 ),
               )
             else ...[
-              TextField(
-                controller: _controller,
-                minLines: 9,
-                maxLines: 16,
-                autocorrect: false,
-                enableSuggestions: false,
-                keyboardType: TextInputType.multiline,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                decoration: const InputDecoration(
-                  alignLabelWithHint: true,
-                  labelText: '.env',
-                  hintText: 'KEY=value',
+              if (_hasChanges)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: DokployTheme.warning.withValues(alpha: .10),
+                    border: Border.all(
+                      color: DokployTheme.warning.withValues(alpha: .45),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: DokployTheme.warning,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Unsaved environment changes',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              for (var index = 0; index < _rows.length; index++)
+                _environmentRow(_rows[index], index),
+              if (_rows.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'No environment variables configured.',
+                      style: TextStyle(color: DokployTheme.muted),
+                    ),
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: () => setState(
+                  () => _rows.add(_EnvironmentRow()),
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Add variable'),
               ),
+              if (_preservedLines.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '${_preservedLines.length} comment or advanced line(s) are preserved unchanged.',
+                  style: const TextStyle(
+                    color: DokployTheme.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              if (_validationMessage case final message?) ...[
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  style: const TextStyle(color: DokployTheme.danger),
+                ),
+              ],
               const SizedBox(height: 10),
               const Text(
                 'Saving does not restart the service. Apply changes with Restart or Redeploy.',
@@ -826,7 +963,9 @@ class _ConfigState extends ConsumerState<_Config> {
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
-                onPressed: _saving ? null : _save,
+                onPressed: _saving || !_hasChanges || _validationMessage != null
+                    ? null
+                    : _save,
                 icon: _saving
                     ? const SizedBox.square(
                         dimension: 18,
@@ -839,6 +978,97 @@ class _ConfigState extends ConsumerState<_Config> {
           ],
         ],
       );
+
+  Widget _environmentRow(_EnvironmentRow row, int index) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final keyField = TextField(
+                controller: row.key,
+                onChanged: (_) => setState(() {}),
+                autocorrect: false,
+                enableSuggestions: false,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: 'Key',
+                  hintText: 'API_TOKEN',
+                  isDense: true,
+                ),
+              );
+              final valueField = TextField(
+                controller: row.value,
+                onChanged: (_) => setState(() {}),
+                autocorrect: false,
+                enableSuggestions: false,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: 'Value',
+                  hintText: 'value',
+                  isDense: true,
+                ),
+              );
+              final remove = IconButton(
+                tooltip: 'Remove variable',
+                onPressed: () => setState(() {
+                  final removed = _rows.removeAt(index);
+                  removed.dispose();
+                }),
+                icon: const Icon(Icons.delete_outline),
+                color: DokployTheme.danger,
+              );
+              if (constraints.maxWidth < 480) {
+                return Column(
+                  children: [
+                    Row(children: [Expanded(child: keyField), remove]),
+                    const SizedBox(height: 9),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: valueField,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(flex: 4, child: keyField),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('='),
+                  ),
+                  Expanded(flex: 5, child: valueField),
+                  remove,
+                ],
+              );
+            },
+          ),
+        ),
+      );
+}
+
+class _EnvironmentRow {
+  _EnvironmentRow({String key = '', String value = ''})
+      : key = TextEditingController(text: key),
+        value = TextEditingController(text: value);
+
+  final TextEditingController key;
+  final TextEditingController value;
+
+  void dispose() {
+    key.dispose();
+    value.dispose();
+  }
+}
+
+bool _validEnvironmentKey(String value) {
+  if (value.isEmpty) return false;
+  bool letterOrUnderscore(int unit) =>
+      unit == 95 || (unit >= 65 && unit <= 90) || (unit >= 97 && unit <= 122);
+  bool digit(int unit) => unit >= 48 && unit <= 57;
+  final units = value.codeUnits;
+  if (!letterOrUnderscore(units.first)) return false;
+  return units.skip(1).every((unit) => letterOrUnderscore(unit) || digit(unit));
 }
 
 extension _FirstOrNull<T> on Iterable<T> {

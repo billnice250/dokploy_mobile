@@ -153,6 +153,7 @@ class RealDokployRepository implements DokployRepository {
 
   HealthState _serviceState(dynamic value) {
     final status = '$value'.toLowerCase();
+    if (status.contains('restart')) return HealthState.restarting;
     // applicationStatus/composeStatus describe the deployment operation, not
     // Docker health. Dokploy uses `running` while that operation is active.
     if (status.contains('run') ||

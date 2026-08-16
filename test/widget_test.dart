@@ -195,6 +195,68 @@ void main() {
     expect(find.text('Done'), findsOneWidget);
     expect(find.text('Redeploy requested successfully.'), findsOneWidget);
   });
+
+  testWidgets('restart uses a distinct restarting status', (tester) async {
+    final repository = _SensitiveRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => repository),
+          sensitiveOperationAuthorizerProvider.overrideWith(
+            (ref) => _FakeAuthorizer(BiometricConfirmationResult.confirmed),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ServiceDetailScreen(serviceId: 'ollama'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Restart'));
+    await tester.pumpAndSettle();
+
+    expect(repository.restartCalls, 1);
+    expect(find.text('Restarting'), findsOneWidget);
+    expect(find.text('Deploying'), findsNothing);
+  });
+
+  testWidgets('environment uses editable key-value rows and change warning',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => _MetricRepository()),
+          sensitiveOperationAuthorizerProvider.overrideWith(
+            (ref) => _FakeAuthorizer(BiometricConfirmationResult.confirmed),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ServiceDetailScreen(serviceId: 'ollama'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Config'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reveal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('APP_ENV'), findsOneWidget);
+    expect(find.text('production'), findsOneWidget);
+    expect(find.text('Unsaved environment changes'), findsNothing);
+
+    await tester.tap(find.text('Add variable'));
+    await tester.pump();
+
+    expect(find.text('Unsaved environment changes'), findsOneWidget);
+    expect(find.text('Every variable needs a key.'), findsOneWidget);
+  });
 }
 
 class _FakeAuthorizer implements SensitiveOperationAuthorizer {
@@ -209,9 +271,13 @@ class _FakeAuthorizer implements SensitiveOperationAuthorizer {
 
 class _SensitiveRepository extends _MetricRepository {
   int redeployCalls = 0;
+  int restartCalls = 0;
 
   @override
   Future<void> redeploy(ServiceModel service) async => redeployCalls++;
+
+  @override
+  Future<void> restart(ServiceModel service) async => restartCalls++;
 }
 
 class _MetricRepository extends MockDokployRepository {

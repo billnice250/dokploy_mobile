@@ -8,7 +8,15 @@ enum ServiceKind {
   redis
 }
 
-enum HealthState { healthy, warning, failed, stopped, deploying, unknown }
+enum HealthState {
+  healthy,
+  warning,
+  failed,
+  stopped,
+  deploying,
+  restarting,
+  unknown
+}
 
 class ServiceEnvironment {
   const ServiceEnvironment({
