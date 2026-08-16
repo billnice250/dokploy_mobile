@@ -256,12 +256,12 @@ class _IntroCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.white.withValues(alpha: .10),
-              Colors.white.withValues(alpha: .025),
+              DokployTheme.elevatedOf(context).withValues(alpha: .9),
+              DokployTheme.panelOf(context).withValues(alpha: .7),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: .12)),
+          border: Border.all(color: DokployTheme.borderOf(context)),
         ),
         child: Row(
           children: [
@@ -275,7 +275,7 @@ class _IntroCard extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(instanceName,
-                      style: const TextStyle(color: DokployTheme.muted)),
+                      style: TextStyle(color: DokployTheme.mutedOf(context))),
                 ],
               ),
             ),
@@ -296,9 +296,9 @@ class _Section extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 9),
             child: Text(title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13,
-                    color: DokployTheme.muted,
+                    color: DokployTheme.mutedOf(context),
                     fontWeight: FontWeight.w600)),
           ),
           Card(child: child),
@@ -317,15 +317,16 @@ class _RelayCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: DokployTheme.info.withValues(alpha: .28)),
         ),
-        child: const Row(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.cloud_off_outlined, color: DokployTheme.info),
-            SizedBox(width: 12),
+            const Icon(Icons.cloud_off_outlined, color: DokployTheme.info),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Relay not paired yet. The upcoming relay will accept Dokploy webhooks and deliver reliable push notifications to this device.',
-                style: TextStyle(color: DokployTheme.muted, height: 1.35),
+                style: TextStyle(
+                    color: DokployTheme.mutedOf(context), height: 1.35),
               ),
             ),
           ],

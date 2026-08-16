@@ -45,10 +45,8 @@ class SectionTitle extends StatelessWidget {
       child: Row(children: [
         Expanded(
             child: Text(title.toUpperCase(),
-                style: Theme.of(c)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(letterSpacing: 1.1, color: DokployTheme.muted))),
+                style: Theme.of(c).textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.1, color: DokployTheme.mutedOf(c)))),
         if (trailing != null) trailing!
       ]));
 }
@@ -70,7 +68,7 @@ class MetricCard extends StatelessWidget {
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (icon != null)
-              Icon(icon, size: 18, color: accent ?? DokployTheme.muted),
+              Icon(icon, size: 18, color: accent ?? DokployTheme.mutedOf(c)),
             const Spacer(),
             Text(value,
                 style: Theme.of(c)
@@ -82,7 +80,7 @@ class MetricCard extends StatelessWidget {
                 style: Theme.of(c)
                     .textTheme
                     .bodySmall
-                    ?.copyWith(color: DokployTheme.muted))
+                    ?.copyWith(color: DokployTheme.mutedOf(c)))
           ])));
 }
 
@@ -108,10 +106,10 @@ class GlassPanel extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Material(
-          color: DokployTheme.panel,
+          color: DokployTheme.panelOf(context),
           shape: RoundedRectangleBorder(
             borderRadius: radius,
-            side: const BorderSide(color: DokployTheme.border),
+            side: BorderSide(color: DokployTheme.borderOf(context)),
           ),
           child: InkWell(
             onTap: onTap,
@@ -184,19 +182,20 @@ class ProgressMetric extends StatelessWidget {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(label),
           Text(available ? '${value.toStringAsFixed(0)}%' : 'Not available',
-              style: const TextStyle(color: DokployTheme.muted))
+              style: TextStyle(color: DokployTheme.mutedOf(c)))
         ]),
         const SizedBox(height: 8),
         LinearProgressIndicator(
             value: available ? (value / 100).clamp(0, 1) : 0,
             minHeight: 6,
             borderRadius: BorderRadius.circular(99),
-            color: available ? _metricColor(value) : DokployTheme.elevated)
+            color:
+                available ? _metricColor(c, value) : DokployTheme.elevatedOf(c))
       ]);
 
-  Color _metricColor(double value) {
+  Color _metricColor(BuildContext context, double value) {
     if (value >= 90) return DokployTheme.danger;
     if (value >= 75) return DokployTheme.warning;
-    return DokployTheme.primary;
+    return Theme.of(context).colorScheme.primary;
   }
 }

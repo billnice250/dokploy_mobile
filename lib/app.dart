@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/local_notifications.dart';
+import 'core/appearance.dart';
 import 'core/live_data_coordinator.dart';
 import 'core/notification_coordinator.dart';
 import 'core/providers.dart';
@@ -65,7 +66,7 @@ class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
         debugShowCheckedModeBanner: false,
         theme: DokployTheme.light,
         darkTheme: DokployTheme.dark,
-        themeMode: ThemeMode.dark,
+        themeMode: ref.watch(themeModeProvider),
         routerConfig: router,
         builder: (context, child) => _RuntimeCoordinator(
           notificationCoordinator: _coordinator,

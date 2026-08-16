@@ -16,9 +16,14 @@ import '../screens/traefik_requests.dart';
 // start at `/`, while deep links and store-screenshot captures can open a
 // specific route without a special build of the app.
 final router = GoRouter(routes: [
-  StatefulShellRoute.indexedStack(
+  StatefulShellRoute(
     builder: (context, state, navigationShell) =>
         AppShell(navigationShell: navigationShell),
+    navigatorContainerBuilder: (context, navigationShell, children) =>
+        AnimatedBranchContainer(
+      currentIndex: navigationShell.currentIndex,
+      children: children,
+    ),
     branches: [
       StatefulShellBranch(routes: [
         GoRoute(path: '/', builder: (c, s) => const DashboardScreen())

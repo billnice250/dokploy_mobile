@@ -60,10 +60,13 @@ class _ProjectCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: DokployTheme.elevated,
+              color: DokployTheme.elevatedOf(context),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.folder_open, color: DokployTheme.primary),
+            child: Icon(
+              Icons.folder_open,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
           title: Text(
             project.name,

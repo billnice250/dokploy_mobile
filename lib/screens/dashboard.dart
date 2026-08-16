@@ -24,7 +24,8 @@ class DashboardScreen extends ConsumerWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: DokployTheme.bg.withValues(alpha: .72),
+        backgroundColor:
+            DokployTheme.backgroundOf(context).withValues(alpha: .82),
         title: Row(
           children: [
             const DokployBrandMark(),
@@ -219,7 +220,7 @@ class _DemoModeBanner extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               DokployTheme.warning.withValues(alpha: .18),
-              DokployTheme.panel,
+              DokployTheme.panelOf(context),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
@@ -668,7 +669,7 @@ class _MiniMetric extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
-            color: DokployTheme.elevated.withValues(alpha: .68),
+            color: DokployTheme.elevatedOf(context).withValues(alpha: .68),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
@@ -744,7 +745,10 @@ class _AmbientBackground extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      Colors.white.withValues(alpha: .055),
+                      Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: .055),
                       Colors.transparent,
                     ],
                   ),

@@ -75,9 +75,9 @@ class _EmptyNotifications extends StatelessWidget {
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: DokployTheme.elevated,
+                  color: DokployTheme.elevatedOf(context),
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: DokployTheme.border),
+                  border: Border.all(color: DokployTheme.borderOf(context)),
                 ),
                 child: const Icon(Icons.notifications_none_rounded, size: 31),
               ),
@@ -118,7 +118,9 @@ class _NotificationTile extends StatelessWidget {
         ),
     };
     return Card(
-      color: event.read ? DokployTheme.panel : DokployTheme.elevated,
+      color: event.read
+          ? DokployTheme.panelOf(context)
+          : DokployTheme.elevatedOf(context),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,

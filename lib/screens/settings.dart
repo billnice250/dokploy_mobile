@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/providers.dart';
+import '../core/appearance.dart';
 import '../core/app_notice.dart';
 import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
@@ -29,6 +30,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(currentInstanceProvider);
     final instances = ref.watch(instancesProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -50,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (current.demo) _instanceTile(current, selected: true),
+          if (current.demo) _instanceTile(context, current, selected: true),
           ...instances.when(
             loading: () => const [LinearProgressIndicator()],
             error: (error, _) =>
@@ -60,6 +62,7 @@ class SettingsScreen extends ConsumerWidget {
                   (instance) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _instanceTile(
+                      context,
                       instance,
                       selected: current.id == instance.id,
                       onTap: () => _switchInstance(context, ref, instance),
@@ -79,6 +82,60 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () => _configureInstance(context, ref),
             icon: const Icon(Icons.add),
             label: const Text('Add Dokploy instance'),
+          ),
+          const SizedBox(height: 26),
+          const Text(
+            'Appearance',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 4),
+                    leading: Icon(Icons.brightness_6_outlined),
+                    title: Text('Theme'),
+                    subtitle: Text(
+                      'Follow your device or choose a DployGo appearance',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<ThemeMode>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          icon: Icon(Icons.brightness_auto_outlined),
+                          label: Text('System'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          icon: Icon(Icons.light_mode_outlined),
+                          label: Text('Light'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          icon: Icon(Icons.dark_mode_outlined),
+                          label: Text('Dark'),
+                        ),
+                      ],
+                      selected: {themeMode},
+                      onSelectionChanged: (selection) {
+                        ref
+                            .read(themeModeProvider.notifier)
+                            .setMode(selection.single);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 26),
           const Text(
@@ -223,6 +280,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _instanceTile(
+    BuildContext context,
     DokployInstance instance, {
     required bool selected,
     VoidCallback? onTap,
@@ -236,11 +294,17 @@ class SettingsScreen extends ConsumerWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: instance.demo ? DokployTheme.border : DokployTheme.primary,
+            color: instance.demo
+                ? DokployTheme.elevatedOf(context)
+                : Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(
-              instance.demo ? Icons.science_outlined : Icons.hexagon_outlined),
+            instance.demo ? Icons.science_outlined : Icons.hexagon_outlined,
+            color: instance.demo
+                ? DokployTheme.foregroundOf(context)
+                : Theme.of(context).colorScheme.onPrimary,
+          ),
         ),
         title: Text(instance.name),
         subtitle: Text(instance.demo ? 'Local demo data' : instance.baseUrl),
@@ -991,9 +1055,9 @@ class _CertificateDetails extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: DokployTheme.elevated.withValues(alpha: .55),
+          color: DokployTheme.elevatedOf(context).withValues(alpha: .55),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: DokployTheme.border),
+          border: Border.all(color: DokployTheme.borderOf(context)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1156,8 +1220,8 @@ class _GuideStep extends StatelessWidget {
               width: compact ? 22 : 26,
               height: compact ? 22 : 26,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: DokployTheme.elevated,
+              decoration: BoxDecoration(
+                color: DokployTheme.elevatedOf(context),
                 shape: BoxShape.circle,
               ),
               child: Text(

@@ -74,12 +74,14 @@ class _NoticeCard extends StatelessWidget {
     };
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xF21A1A1D),
+        color: DokployTheme.panelOf(context),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: color.withValues(alpha: .42)),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x66000000),
+            color: Colors.black.withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark ? .4 : .14,
+            ),
             blurRadius: 24,
             offset: Offset(0, 10),
           ),
@@ -106,16 +108,16 @@ class _NoticeCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: DokployTheme.foregroundOf(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     message,
-                    style: const TextStyle(
-                      color: Color(0xFFB8B8C0),
+                    style: TextStyle(
+                      color: DokployTheme.mutedOf(context),
                       fontSize: 13,
                     ),
                   ),
@@ -126,7 +128,8 @@ class _NoticeCard extends StatelessWidget {
               tooltip: 'Dismiss',
               onPressed: onDismiss,
               visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.close, size: 18, color: Color(0xFF9999A2)),
+              icon: Icon(Icons.close,
+                  size: 18, color: DokployTheme.mutedOf(context)),
             ),
           ],
         ),

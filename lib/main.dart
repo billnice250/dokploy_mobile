@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/appearance.dart';
 import 'core/providers.dart';
 import 'core/local_notifications.dart';
 import 'data/dokploy_api.dart';
@@ -15,9 +16,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalNotificationService.instance.initialize();
   final bootstrap = await _restoreActiveInstance();
+  const appearanceStore = AppearanceStore();
+  final initialThemeMode = await appearanceStore.load();
   runApp(
     ProviderScope(
       overrides: [
+        themeModeProvider.overrideWith(
+          (ref) => AppearanceController(
+            store: appearanceStore,
+            initialMode: initialThemeMode,
+          ),
+        ),
         if (bootstrap != null) ...[
           currentInstanceProvider.overrideWith((ref) => bootstrap.instance),
           repositoryProvider.overrideWith((ref) => bootstrap.repository),

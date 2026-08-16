@@ -36,19 +36,25 @@ class AppShell extends StatelessWidget {
                       height: 68,
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: const Color(0xD9202024),
+                        color:
+                            DokployTheme.panelOf(context).withValues(alpha: .9),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: .14),
+                          color: DokployTheme.borderOf(context),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: .42),
+                            color: Colors.black.withValues(
+                              alpha: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? .42
+                                  : .14,
+                            ),
                             blurRadius: 28,
                             offset: const Offset(0, 12),
                           ),
                           BoxShadow(
-                            color: Colors.white.withValues(alpha: .035),
+                            color: Colors.white.withValues(alpha: .12),
                             blurRadius: 8,
                             offset: const Offset(0, -1),
                           ),
@@ -100,57 +106,116 @@ class _GlassDestination extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: Tooltip(
-          message: label,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(21),
-            onTap: onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
+  Widget build(BuildContext context) {
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final foreground = DokployTheme.foregroundOf(context);
+    final muted = DokployTheme.mutedOf(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(21),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: disableAnimations
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              color: selected
+                  ? DokployTheme.elevatedOf(context).withValues(alpha: .9)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(21),
+              border: Border.all(
                 color: selected
-                    ? Colors.white.withValues(alpha: .13)
+                    ? DokployTheme.borderOf(context)
                     : Colors.transparent,
-                borderRadius: BorderRadius.circular(21),
-                border: Border.all(
-                  color: selected
-                      ? Colors.white.withValues(alpha: .11)
-                      : Colors.transparent,
-                ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedSwitcher(
+                  duration: disableAnimations
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  child: AnimatedScale(
+                    scale: selected ? 1.08 : 1,
+                    duration: disableAnimations
+                        ? Duration.zero
+                        : const Duration(milliseconds: 220),
+                    curve: Curves.easeOutBack,
                     child: Icon(
                       selected ? selectedIcon : icon,
                       key: ValueKey(selected),
                       size: 21,
-                      color:
-                          selected ? DokployTheme.primary : DokployTheme.muted,
+                      color: selected ? foreground : muted,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color:
-                          selected ? DokployTheme.primary : DokployTheme.muted,
-                    ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? foreground : muted,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+class AnimatedBranchContainer extends StatelessWidget {
+  const AnimatedBranchContainer({
+    super.key,
+    required this.currentIndex,
+    required this.children,
+  });
+
+  final int currentIndex;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (var index = 0; index < children.length; index++)
+          IgnorePointer(
+            ignoring: index != currentIndex,
+            child: ExcludeSemantics(
+              excluding: index != currentIndex,
+              // Keep the opacity ticker outside TickerMode. Otherwise an
+              // outgoing branch is paused before it can become transparent
+              // and can leave the last (Servers) scaffold painted on top.
+              child: AnimatedOpacity(
+                key: ValueKey('branch-opacity-$index'),
+                opacity: index == currentIndex ? 1 : 0,
+                duration: disableAnimations
+                    ? Duration.zero
+                    : const Duration(milliseconds: 230),
+                curve: Curves.easeOutCubic,
+                child: TickerMode(
+                  enabled: index == currentIndex,
+                  child: children[index],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

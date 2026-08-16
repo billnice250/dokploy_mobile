@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:dokploy_mobile/app.dart';
+import 'package:dokploy_mobile/core/appearance.dart';
 import 'package:dokploy_mobile/core/providers.dart';
 import 'package:dokploy_mobile/core/router.dart';
 import 'package:dokploy_mobile/core/biometric_confirmation.dart';
@@ -13,6 +14,7 @@ import 'package:dokploy_mobile/screens/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('demo command center renders', (tester) async {
@@ -216,6 +218,71 @@ void main() {
     expect(find.text('Projects'), findsWidgets);
     expect(find.text('Activity'), findsWidgets);
     expect(find.text('Servers'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('can leave Servers through the animated navigation bar',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    router.go('/servers');
+    addTearDown(() {
+      router.go('/');
+      tester.binding.setSurfaceSize(null);
+    });
+    await tester.pumpWidget(
+      const ProviderScope(child: DokployMobileApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Home').last);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(router.routeInformationProvider.value.uri.path, '/');
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+              find.byKey(const ValueKey('branch-opacity-0')))
+          .opacity,
+      1,
+    );
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+              find.byKey(const ValueKey('branch-opacity-3')))
+          .opacity,
+      0,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('appearance control switches and persists the app theme',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    router.go('/settings');
+    addTearDown(() {
+      router.go('/');
+      tester.binding.setSurfaceSize(null);
+    });
+    await tester.pumpWidget(
+      const ProviderScope(child: DokployMobileApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    expect(
+      Theme.of(tester.element(find.byType(SettingsScreen))).brightness,
+      Brightness.light,
+    );
+
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+    expect(
+      Theme.of(tester.element(find.byType(SettingsScreen))).brightness,
+      Brightness.dark,
+    );
+    expect(await const AppearanceStore().load(), ThemeMode.dark);
     expect(tester.takeException(), isNull);
   });
 

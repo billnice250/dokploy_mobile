@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class DokployTheme {
@@ -15,6 +16,30 @@ class DokployTheme {
   static const warning = Color(0xFFF59E0B);
   static const danger = Color(0xFFEF4444);
 
+  static const _pageTransitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.android: _DployGoPageTransitionsBuilder(),
+      TargetPlatform.fuchsia: _DployGoPageTransitionsBuilder(),
+      TargetPlatform.linux: _DployGoPageTransitionsBuilder(),
+      TargetPlatform.windows: _DployGoPageTransitionsBuilder(),
+    },
+  );
+
+  static Color backgroundOf(BuildContext context) =>
+      Theme.of(context).colorScheme.surface;
+  static Color panelOf(BuildContext context) =>
+      Theme.of(context).colorScheme.surfaceContainer;
+  static Color elevatedOf(BuildContext context) =>
+      Theme.of(context).colorScheme.surfaceContainerHigh;
+  static Color borderOf(BuildContext context) =>
+      Theme.of(context).colorScheme.outlineVariant;
+  static Color foregroundOf(BuildContext context) =>
+      Theme.of(context).colorScheme.onSurface;
+  static Color mutedOf(BuildContext context) =>
+      Theme.of(context).colorScheme.onSurfaceVariant;
+
   static ThemeData get dark {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
@@ -26,6 +51,7 @@ class DokployTheme {
       secondary: elevated,
       onSecondary: primary,
       outline: border,
+      outlineVariant: border,
       surfaceContainer: panel,
       surfaceContainerHigh: elevated,
     );
@@ -76,11 +102,111 @@ class DokployTheme {
         side: BorderSide(color: border),
       ),
       dividerColor: border,
+      pageTransitionsTheme: _pageTransitions,
     );
   }
 
-  static ThemeData get light => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF18181B)),
-      );
+  static ThemeData get light {
+    const lightBg = Color(0xFFF4F4F5);
+    const lightPanel = Color(0xEFFFFFFF);
+    const lightElevated = Color(0xFFE4E4E7);
+    const lightBorder = Color(0xFFD4D4D8);
+    const lightPrimary = Color(0xFF18181B);
+    const lightMuted = Color(0xFF52525B);
+    const lightOnPrimary = Color(0xFFFAFAFA);
+    const scheme = ColorScheme.light(
+      primary: lightPrimary,
+      onPrimary: lightOnPrimary,
+      secondary: lightElevated,
+      onSecondary: lightPrimary,
+      surface: lightBg,
+      onSurface: lightPrimary,
+      surfaceContainer: lightPanel,
+      surfaceContainerHigh: lightElevated,
+      onSurfaceVariant: lightMuted,
+      outline: lightBorder,
+      outlineVariant: lightBorder,
+      error: danger,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: lightBg,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: lightBg,
+        foregroundColor: lightPrimary,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      cardTheme: const CardThemeData(
+        color: lightPanel,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: lightBorder),
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+        ),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        filled: true,
+        fillColor: lightPanel,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: lightBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: lightBorder),
+        ),
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: lightPanel,
+        indicatorColor: lightElevated,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: lightPrimary,
+          foregroundColor: lightOnPrimary,
+        ),
+      ),
+      chipTheme: const ChipThemeData(
+        backgroundColor: lightElevated,
+        side: BorderSide(color: lightBorder),
+      ),
+      dividerColor: lightBorder,
+      pageTransitionsTheme: _pageTransitions,
+    );
+  }
+}
+
+class _DployGoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _DployGoPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (route.isFirst ||
+        MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      return child;
+    }
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: .985, end: 1).animate(curved),
+        child: child,
+      ),
+    );
+  }
 }
