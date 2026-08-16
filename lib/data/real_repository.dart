@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -11,6 +12,9 @@ class RealDokployRepository implements DokployRepository {
   final DokployApi api;
   Future<CapabilitySet>? _capabilitiesRequest;
   Future<dynamic>? _projectsRequest;
+  dynamic _projectsCache;
+  DateTime? _projectsCachedAt;
+  Future<List<DeploymentModel>>? _deploymentsRequest;
 
   @override
   Future<CapabilitySet> capabilities() =>
@@ -40,6 +44,7 @@ class RealDokployRepository implements DokployRepository {
         schedules: false,
         domains: false,
         databases: serviceRead,
+        traefikRequests: serviceRead,
       );
     } on DokployFailure {
       // Older/changed Dokploy versions may not expose this endpoint to API
@@ -145,59 +150,75 @@ class RealDokployRepository implements DokployRepository {
         );
       }).toList();
 
-  Future<dynamic> _projectHierarchy() =>
-      _projectsRequest ??= _loadProjectHierarchy();
+  Future<dynamic> _projectHierarchy() {
+    final cachedAt = _projectsCachedAt;
+    if (_projectsCache != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < const Duration(seconds: 5)) {
+      return Future.value(_projectsCache);
+    }
+    return _projectsRequest ??= _loadProjectHierarchy();
+  }
 
   Future<dynamic> _loadProjectHierarchy() async {
     try {
-      return await api.projects();
+      final value = await api.projects();
+      _projectsCache = value;
+      _projectsCachedAt = DateTime.now();
+      return value;
     } finally {
       _projectsRequest = null;
     }
   }
 
   @override
-  Future<List<DeploymentModel>> deployments() async {
-    if (!(await capabilities()).deployments) return const [];
-    return _list(await api.deploymentsCentralized()).whereType<Map>().map((m) {
-      final startedAt = DateTime.tryParse(_s(m, ['startedAt']));
-      final finishedAt = DateTime.tryParse(_s(m, ['finishedAt']));
-      final duration = startedAt == null
-          ? 0
-          : (finishedAt ?? DateTime.now()).difference(startedAt).inSeconds;
-      return DeploymentModel(
-        id: _s(m, ['deploymentId', 'id']),
-        service: _deploymentService(m),
-        serviceId: _deploymentServiceId(m),
-        status: _state(m['status']),
-        createdAt: DateTime.tryParse(_s(m, ['createdAt'])) ?? DateTime.now(),
-        startedAt: startedAt,
-        finishedAt: finishedAt,
-        durationSeconds: duration < 0 ? 0 : duration,
-        commit: _s(m, ['commit', 'commitSha']),
-        branch: _s(m, ['branch'], 'main'),
-        title: _s(m, ['title', 'trigger']),
-        errorMessage: _s(m, ['errorMessage', 'error']),
-        message: _s(m, ['description', 'message']),
-      );
-    }).toList();
+  Future<List<DeploymentModel>> deployments() =>
+      _deploymentsRequest ??= _loadDeployments();
+
+  Future<List<DeploymentModel>> _loadDeployments() async {
+    try {
+      if (!(await capabilities()).deployments) return const [];
+      return _list(await api.deploymentsCentralized())
+          .whereType<Map>()
+          .map((m) {
+        final startedAt = DateTime.tryParse(_s(m, ['startedAt']));
+        final finishedAt = DateTime.tryParse(_s(m, ['finishedAt']));
+        final duration = startedAt == null
+            ? 0
+            : (finishedAt ?? DateTime.now()).difference(startedAt).inSeconds;
+        return DeploymentModel(
+          id: _s(m, ['deploymentId', 'id']),
+          service: _deploymentService(m),
+          serviceId: _deploymentServiceId(m),
+          status: _state(m['status']),
+          createdAt: DateTime.tryParse(_s(m, ['createdAt'])) ?? DateTime.now(),
+          startedAt: startedAt,
+          finishedAt: finishedAt,
+          durationSeconds: duration < 0 ? 0 : duration,
+          commit: _s(m, ['commit', 'commitSha']),
+          branch: _s(m, ['branch'], 'main'),
+          title: _s(m, ['title', 'trigger']),
+          errorMessage: _s(m, ['errorMessage', 'error']),
+          message: _s(m, ['description', 'message']),
+        );
+      }).toList();
+    } finally {
+      _deploymentsRequest = null;
+    }
   }
 
   @override
   Future<List<ServerModel>> servers() async {
     if (!(await capabilities()).servers) return const [];
     try {
-      final caps = await capabilities();
       final rawServers = _list(await api.servers()).whereType<Map>().toList();
       final servers = await Future.wait(
-        rawServers.map((server) => _serverWithMetrics(server, caps.metrics)),
+        rawServers.map((server) => _serverWithMetrics(server)),
       );
-      if (caps.metrics) {
-        final controlPlane = await _controlPlaneMetrics();
-        if (controlPlane != null &&
-            !servers.any((server) => server.host == controlPlane.host)) {
-          servers.insert(0, controlPlane);
-        }
+      final controlPlane = await _controlPlaneMetrics();
+      if (controlPlane != null &&
+          !servers.any((server) => server.host == controlPlane.host)) {
+        servers.insert(0, controlPlane);
       }
       return servers;
     } on DokployFailure catch (failure) {
@@ -208,7 +229,7 @@ class RealDokployRepository implements DokployRepository {
     }
   }
 
-  Future<ServerModel> _serverWithMetrics(Map raw, bool metricsAllowed) async {
+  Future<ServerModel> _serverWithMetrics(Map raw) async {
     final host = _s(raw, ['ipAddress', 'host', 'hostname']);
     final base = ServerModel(
       id: _s(raw, ['serverId', 'id']),
@@ -221,17 +242,20 @@ class RealDokployRepository implements DokployRepository {
       metricsAvailable: false,
       monitoringConfigured: false,
     );
-    if (!metricsAllowed || host.isEmpty) return base;
+    if (host.isEmpty) return base;
     final config = _mapAt(_mapAt(raw, 'metricsConfig'), 'server');
     final token = _s(config, ['token']);
     final port = int.tryParse(_s(config, ['port'])) ?? 4500;
-    if (token.isEmpty) return base;
-    final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
-    return _loadServerMetrics(
-      base.copyWith(monitoringConfigured: true),
-      url.toString(),
-      token,
-    );
+    if (token.isNotEmpty) {
+      final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
+      final monitored = await _loadServerMetrics(
+        base.copyWith(monitoringConfigured: true),
+        url.toString(),
+        token,
+      );
+      if (monitored.metricsAvailable) return monitored;
+    }
+    return _serverHealthFallback(base, serverId: base.id);
   }
 
   Future<ServerModel?> _controlPlaneMetrics() async {
@@ -253,15 +277,59 @@ class RealDokployRepository implements DokployRepository {
         metricsAvailable: false,
         monitoringConfigured: false,
       );
-      if (token.isEmpty) return base;
-      final url = Uri(scheme: 'http', host: host, port: port, path: '/metrics');
-      return _loadServerMetrics(
-        base.copyWith(monitoringConfigured: true),
-        url.toString(),
-        token,
-      );
+      final free = await _freeHostMetrics(base);
+      if (free.metricsAvailable) return free;
+      if (token.isNotEmpty && raw['enabledFeatures'] != false) {
+        final url =
+            Uri(scheme: 'http', host: host, port: port, path: '/metrics');
+        final monitored = await _loadServerMetrics(
+          base.copyWith(monitoringConfigured: true),
+          url.toString(),
+          token,
+        );
+        if (monitored.metricsAvailable) return monitored;
+      }
+      return _serverHealthFallback(base);
     } on DokployFailure {
       return null;
+    }
+  }
+
+  Future<ServerModel> _serverHealthFallback(
+    ServerModel base, {
+    String? serverId,
+  }) async {
+    try {
+      final raw = await api
+          .serverHealth(serverId: serverId)
+          .timeout(const Duration(seconds: 6));
+      if (raw is! Map) return base;
+      final resources = _mapAt(raw, 'resources');
+      final disk = _mapAt(raw, 'disk');
+      final memoryTotal = _d(resources['memTotalBytes']);
+      final memoryUsed = _d(resources['memUsedBytes']);
+      final diskTotal = _d(disk['totalBytes']);
+      final diskUsed = _d(disk['usedBytes']);
+      if (memoryTotal <= 0 && diskTotal <= 0) return base;
+      return base.copyWith(
+        memory: memoryTotal <= 0 ? 0 : memoryUsed / memoryTotal * 100,
+        disk: diskTotal <= 0 ? 0 : diskUsed / diskTotal * 100,
+        memoryUsedGb: memoryUsed / (1024 * 1024 * 1024),
+        memoryTotalGb: memoryTotal / (1024 * 1024 * 1024),
+        diskTotalGb: diskTotal / (1024 * 1024 * 1024),
+        metricsAvailable: true,
+      );
+    } on Object {
+      return base;
+    }
+  }
+
+  Future<ServerModel> _freeHostMetrics(ServerModel base) async {
+    try {
+      final raw = await api.applicationMonitoring('dokploy');
+      return raw is Map ? _hostFromMonitoring(base, raw) : base;
+    } on DokployFailure {
+      return base;
     }
   }
 
@@ -272,7 +340,9 @@ class RealDokployRepository implements DokployRepository {
   ) async {
     try {
       final values = _metricList(
-        await api.serverMetrics(url: url, token: token, dataPoints: 3),
+        await api
+            .serverMetrics(url: url, token: token, dataPoints: 3)
+            .timeout(const Duration(seconds: 6)),
       ).whereType<Map>();
       if (values.isEmpty) return base;
       final metric = values.last;
@@ -295,7 +365,7 @@ class RealDokployRepository implements DokployRepository {
         memoryTotalGb: _metricNumber(metric, ['memTotal', 'memoryTotal']),
         diskTotalGb: _metricNumber(metric, ['totalDisk', 'diskTotal']),
       );
-    } on DokployFailure {
+    } on Object {
       return base;
     }
   }
@@ -379,6 +449,36 @@ class RealDokployRepository implements DokployRepository {
       failure.kind == DokployFailureKind.unsupportedFeature;
   @override
   Future<List<ServiceModel>> services() async {
+    final results = await Future.wait<dynamic>([
+      _loadBaseServices(),
+      deployments(),
+    ]);
+    final services = results[0] as List<ServiceModel>;
+    final recentDeployments = results[1] as List<DeploymentModel>;
+    final latest = <String, DeploymentModel>{};
+    for (final deployment in recentDeployments) {
+      if (deployment.serviceId.isEmpty) continue;
+      final current = latest[deployment.serviceId];
+      if (current == null || deployment.createdAt.isAfter(current.createdAt)) {
+        latest[deployment.serviceId] = deployment;
+      }
+    }
+    return services.map((service) {
+      final deployment = latest[service.id];
+      return deployment?.status == HealthState.deploying
+          ? service.copyWith(status: HealthState.deploying)
+          : service;
+    }).toList();
+  }
+
+  Future<List<ServiceModel>> _loadBaseServices() async {
+    try {
+      final overview = _list(await api.overviewServices());
+      if (overview.isNotEmpty) return _servicesFromOverview(overview);
+    } on DokployFailure {
+      // overview.services was added in Dokploy 0.30. Fall back to the project
+      // hierarchy for older versions and partially upgraded installations.
+    }
     // project.all already contains the complete project → environment →
     // service hierarchy in Dokploy v0.29.14. Mapping it directly avoids extra
     // project.one requests and keeps this read path compatible with API keys.
@@ -413,6 +513,31 @@ class RealDokployRepository implements DokployRepository {
     }
     return services;
   }
+
+  List<ServiceModel> _servicesFromOverview(List<dynamic> raw) =>
+      raw.whereType<Map>().map((service) {
+        final kind = _kindFromType(_s(service, ['type']));
+        return ServiceModel(
+          id: _s(service, ['id']),
+          name: _s(service, ['name', 'appName'], 'Service'),
+          kind: kind,
+          status: _state(service['status']),
+          project: _s(service, ['projectName'], 'Production'),
+          appName: _s(service, ['appName', 'name']),
+          serverId: _s(service, ['serverId']),
+          metricsAvailable: false,
+        );
+      }).toList();
+
+  ServiceKind _kindFromType(String value) => switch (value.toLowerCase()) {
+        'compose' => ServiceKind.compose,
+        'postgres' => ServiceKind.postgres,
+        'mysql' => ServiceKind.mysql,
+        'mariadb' => ServiceKind.mariadb,
+        'mongo' => ServiceKind.mongo,
+        'redis' => ServiceKind.redis,
+        _ => ServiceKind.application,
+      };
 
   @override
   Future<ServiceModel> serviceDetails(ServiceModel service) async {
@@ -574,17 +699,23 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<DashboardSnapshot> dashboard() async {
     final caps = await capabilities();
-    final ss = await services();
-    final ds = await deployments();
-    final sv = await servers();
-    final ps = await projects();
+    final results = await Future.wait<dynamic>([
+      services(),
+      deployments(),
+      projects(),
+    ]);
+    final ss = results[0] as List<ServiceModel>;
+    final ds = results[1] as List<DeploymentModel>;
+    final ps = results[2] as List<ProjectModel>;
     return DashboardSnapshot(
         running: ss.where((x) => x.status == HealthState.healthy).length,
         stopped: ss.where((x) => x.status == HealthState.stopped).length,
         failed: ss.where((x) => x.status == HealthState.failed).length,
         projects: ps,
         deployments: ds.take(5).toList(),
-        servers: sv,
+        // Server inventory and metrics load progressively through their own
+        // provider, so a slow monitor cannot block the first dashboard paint.
+        servers: const [],
         attention: [
           if (!caps.servers)
             'Server inventory is unavailable for this API token',
@@ -675,4 +806,174 @@ class RealDokployRepository implements DokployRepository {
   Future<List<ScheduleModel>> schedules() async => const [];
   @override
   Future<List<DomainModel>> domains() async => const [];
+
+  @override
+  Future<TraefikRequestPage> traefikRequests({int limit = 200}) async {
+    final enabledRaw = await api.requestsActive();
+    final enabled = enabledRaw == true || '$enabledRaw'.toLowerCase() == 'true';
+    if (!enabled) {
+      return const TraefikRequestPage(
+        enabled: false,
+        items: [],
+        totalCount: 0,
+      );
+    }
+    final raw = await api.traefikRequests(limit: limit);
+    final map = raw is Map ? raw : const {};
+    final items = _list(map['data']).whereType<Map>().map((entry) {
+      final nanos = _d(entry['Duration']);
+      return TraefikRequestModel(
+        timestamp: DateTime.tryParse(_s(entry, ['StartUTC', 'time'])) ??
+            DateTime.now(),
+        method: _s(entry, ['RequestMethod'], 'GET'),
+        host: _s(entry, ['RequestHost']),
+        path: _s(entry, ['RequestPath'], '/'),
+        statusCode: _d(entry['DownstreamStatus']).round(),
+        durationMs: nanos / 1000000,
+        clientHost: _s(entry, ['ClientHost', 'ClientAddr']),
+        router: _s(entry, ['RouterName']),
+        service: _s(entry, ['ServiceName']),
+        protocol: _s(entry, ['RequestProtocol']),
+      );
+    }).toList();
+    return TraefikRequestPage(
+      enabled: true,
+      items: items,
+      totalCount: _d(map['totalCount']).round().clamp(items.length, 1 << 31),
+    );
+  }
+
+  @override
+  Stream<ServerModel> watchControlPlaneMetrics() async* {
+    var base = const ServerModel(
+      id: 'dokploy-control-plane',
+      name: 'Dokploy host',
+      host: 'local',
+      status: HealthState.healthy,
+      cpu: 0,
+      memory: 0,
+      disk: 0,
+      metricsAvailable: false,
+      monitoringConfigured: true,
+    );
+    try {
+      final config = await api.metricsConfig();
+      if (config is Map) {
+        final host = _s(config, ['serverIp']);
+        if (host.isNotEmpty) {
+          base = ServerModel(
+            id: base.id,
+            name: base.name,
+            host: host,
+            status: base.status,
+            cpu: 0,
+            memory: 0,
+            disk: 0,
+            metricsAvailable: false,
+            monitoringConfigured: true,
+          );
+        }
+      }
+    } on DokployFailure {
+      // The WebSocket can still provide host stats without paid monitoring.
+    }
+    while (true) {
+      try {
+        await for (final message in api.dockerStats(appName: 'dokploy')) {
+          if (message is Map && message['data'] is Map) {
+            final value = _hostFromMonitoring(base, message['data'] as Map);
+            if (value.metricsAvailable) yield value;
+          }
+        }
+      } on Object {
+        // Reconnect below after a short backoff.
+      }
+      await Future<void>.delayed(const Duration(seconds: 3));
+    }
+  }
+
+  @override
+  Stream<ServiceModel> watchServiceMetrics(ServiceModel service) async* {
+    if (service.appName.isEmpty ||
+        (service.kind != ServiceKind.application &&
+            service.kind != ServiceKind.compose)) {
+      return;
+    }
+    final appType =
+        service.kind == ServiceKind.compose ? 'docker-compose' : 'application';
+    while (true) {
+      try {
+        await for (final message in api.dockerStats(
+          appName: service.appName,
+          appType: appType,
+          serviceId: service.id,
+        )) {
+          if (message is Map && message['data'] is Map) {
+            yield _serviceFromMonitoring(service, message['data'] as Map);
+          }
+        }
+      } on Object {
+        // Reconnect below after a short backoff.
+      }
+      await Future<void>.delayed(const Duration(seconds: 3));
+    }
+  }
+
+  ServerModel _hostFromMonitoring(ServerModel base, Map raw) {
+    final cpu = _monitoringEntry(raw, 'cpu');
+    final memory = _monitoringEntry(raw, 'memory');
+    final disk = _monitoringEntry(raw, 'disk');
+    final network = _monitoringEntry(raw, 'network');
+    final memoryValue = _mapAt(memory, 'value');
+    final diskValue = _mapAt(disk, 'value');
+    final networkValue = _mapAt(network, 'value');
+    final usedMb = _toMegabytes(memoryValue['used']);
+    final totalMb = _toMegabytes(memoryValue['total']);
+    final diskTotal = _d(diskValue['diskTotal']);
+    final hasMetrics = cpu.isNotEmpty || memory.isNotEmpty || disk.isNotEmpty;
+    return base.copyWith(
+      cpu: _d(cpu['value']),
+      memory: totalMb <= 0 ? 0 : usedMb / totalMb * 100,
+      disk: _d(diskValue['diskUsedPercentage']),
+      metricsAvailable: hasMetrics,
+      monitoringConfigured: true,
+      memoryUsedGb: usedMb / 1024,
+      memoryTotalGb: totalMb / 1024,
+      diskTotalGb: diskTotal,
+      networkInKbps: _d(networkValue['inputMb']),
+      networkOutKbps: _d(networkValue['outputMb']),
+    );
+  }
+
+  ServiceModel _serviceFromMonitoring(ServiceModel service, Map raw) {
+    final cpu = _monitoringEntry(raw, 'cpu');
+    final memory = _monitoringEntry(raw, 'memory');
+    final network = _monitoringEntry(raw, 'network');
+    final memoryValue = _mapAt(memory, 'value');
+    final networkValue = _mapAt(network, 'value');
+    final timestamps = [cpu, memory, network]
+        .map((entry) => DateTime.tryParse(_s(entry, ['time'])))
+        .whereType<DateTime>()
+        .toList();
+    return service.copyWith(
+      cpu: _d(cpu['value']),
+      memoryMb: _toMegabytes(memoryValue['used']),
+      networkReceivedMb: _d(networkValue['inputMb']),
+      networkSentMb: _d(networkValue['outputMb']),
+      metricsAvailable:
+          cpu.isNotEmpty || memory.isNotEmpty || network.isNotEmpty,
+      metricsUpdatedAt: timestamps.isEmpty
+          ? DateTime.now()
+          : timestamps.reduce((a, b) => a.isAfter(b) ? a : b),
+    );
+  }
+
+  Map _monitoringEntry(Map raw, String key) {
+    final value = raw[key];
+    if (value is Map) return value;
+    if (value is List && value.isNotEmpty && value.last is Map) {
+      return value.last as Map;
+    }
+    return const {};
+  }
 }

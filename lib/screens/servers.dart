@@ -14,6 +14,7 @@ class ServersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final servers = ref.watch(serversProvider);
+    final liveServer = ref.watch(liveControlPlaneMetricsProvider).valueOrNull;
     final instance = ref.watch(currentInstanceProvider);
     return Scaffold(
       appBar: AppBar(
@@ -29,165 +30,168 @@ class ServersScreen extends ConsumerWidget {
       body: servers.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('$error')),
-        data: (items) => items.isEmpty
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.lock_outline,
-                          size: 36, color: DokployTheme.muted),
-                      SizedBox(height: 12),
-                      Text(
-                        'Server inventory unavailable',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w700),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        'This API token may not include server access.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: DokployTheme.muted),
-                      ),
-                    ],
+        data: (rawItems) {
+          final items = _mergeServerMetrics(rawItems, liveServer);
+          return items.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_outline,
+                            size: 36, color: DokployTheme.muted),
+                        SizedBox(height: 12),
+                        Text(
+                          'Server inventory unavailable',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'This API token may not include server access.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: DokployTheme.muted),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 112),
-                children: [
-                  for (final server in items)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: GlassPanel(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                StatusDot(server.status),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        server.name,
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      Text(
-                                        server.host,
-                                        style: const TextStyle(
-                                            color: DokployTheme.muted),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            if (!server.metricsAvailable) ...[
-                              ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: const Icon(
-                                  Icons.monitor_heart_outlined,
-                                  color: DokployTheme.muted,
-                                ),
-                                title: Text(server.monitoringConfigured
-                                    ? 'Waiting for monitoring data'
-                                    : 'Monitoring is not enabled'),
-                                subtitle: Text(
-                                  server.monitoringConfigured
-                                      ? 'The collector is configured but has not returned a sample yet.'
-                                      : 'Enable Dokploy monitoring to collect CPU, memory and storage usage.',
-                                  style: const TextStyle(
-                                      color: DokployTheme.muted),
-                                ),
-                              ),
-                              if (!instance.demo &&
-                                  !server.monitoringConfigured)
-                                FilledButton.icon(
-                                  onPressed: () =>
-                                      _enableMonitoring(context, ref, server),
-                                  icon:
-                                      const Icon(Icons.monitor_heart_outlined),
-                                  label: const Text('Enable monitoring'),
-                                ),
-                            ] else ...[
-                              ProgressMetric(label: 'CPU', value: server.cpu),
-                              const SizedBox(height: 14),
-                              ProgressMetric(
-                                  label: 'Memory', value: server.memory),
-                              if (server.memoryTotalGb > 0) ...[
-                                const SizedBox(height: 5),
-                                Text(
-                                  '${server.memoryUsedGb.toStringAsFixed(1)} GB of ${server.memoryTotalGb.toStringAsFixed(1)} GB',
-                                  style: const TextStyle(
-                                    color: DokployTheme.muted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 14),
-                              ProgressMetric(
-                                  label: 'Storage', value: server.disk),
-                              if (server.diskTotalGb > 0) ...[
-                                const SizedBox(height: 5),
-                                Text(
-                                  '${server.diskUsedGb.toStringAsFixed(1)} GB used of ${server.diskTotalGb.toStringAsFixed(1)} GB  •  ${server.diskFreeGb.toStringAsFixed(1)} GB free',
-                                  style: const TextStyle(
-                                    color: DokployTheme.muted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 18),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 112),
+                  children: [
+                    for (final server in items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: GlassPanel(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Row(
                                 children: [
+                                  StatusDot(server.status),
+                                  const SizedBox(width: 10),
                                   Expanded(
-                                    child: _NetworkValue(
-                                      icon: Icons.south,
-                                      label: 'Network in',
-                                      value: server.networkInKbps,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _NetworkValue(
-                                      icon: Icons.north,
-                                      label: 'Network out',
-                                      value: server.networkOutKbps,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          server.name,
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          server.host,
+                                          style: const TextStyle(
+                                              color: DokployTheme.muted),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                            if (!instance.demo) ...[
-                              const SizedBox(height: 18),
-                              const Divider(),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _clearStorage(context, ref, server),
-                                  icon: const Icon(
-                                      Icons.cleaning_services_outlined),
-                                  label: const Text('Clear unused storage'),
+                              const SizedBox(height: 20),
+                              if (!server.metricsAvailable) ...[
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(
+                                    Icons.monitor_heart_outlined,
+                                    color: DokployTheme.muted,
+                                  ),
+                                  title: Text(server.monitoringConfigured
+                                      ? 'Waiting for monitoring data'
+                                      : 'Monitoring is not enabled'),
+                                  subtitle: Text(
+                                    server.monitoringConfigured
+                                        ? 'The collector is configured but has not returned a sample yet.'
+                                        : 'Enable Dokploy monitoring to collect CPU, memory and storage usage.',
+                                    style: const TextStyle(
+                                        color: DokployTheme.muted),
+                                  ),
                                 ),
-                              ),
+                                if (!instance.demo &&
+                                    !server.monitoringConfigured)
+                                  FilledButton.icon(
+                                    onPressed: () =>
+                                        _enableMonitoring(context, ref, server),
+                                    icon: const Icon(
+                                        Icons.monitor_heart_outlined),
+                                    label: const Text('Enable monitoring'),
+                                  ),
+                              ] else ...[
+                                ProgressMetric(label: 'CPU', value: server.cpu),
+                                const SizedBox(height: 14),
+                                ProgressMetric(
+                                    label: 'Memory', value: server.memory),
+                                if (server.memoryTotalGb > 0) ...[
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    '${server.memoryUsedGb.toStringAsFixed(1)} GB of ${server.memoryTotalGb.toStringAsFixed(1)} GB',
+                                    style: const TextStyle(
+                                      color: DokployTheme.muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 14),
+                                ProgressMetric(
+                                    label: 'Storage', value: server.disk),
+                                if (server.diskTotalGb > 0) ...[
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    '${server.diskUsedGb.toStringAsFixed(1)} GB used of ${server.diskTotalGb.toStringAsFixed(1)} GB  •  ${server.diskFreeGb.toStringAsFixed(1)} GB free',
+                                    style: const TextStyle(
+                                      color: DokployTheme.muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 18),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _NetworkValue(
+                                        icon: Icons.south,
+                                        label: 'Network in',
+                                        value: server.networkInKbps,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _NetworkValue(
+                                        icon: Icons.north,
+                                        label: 'Network out',
+                                        value: server.networkOutKbps,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (!instance.demo) ...[
+                                const SizedBox(height: 18),
+                                const Divider(),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _clearStorage(context, ref, server),
+                                    icon: const Icon(
+                                        Icons.cleaning_services_outlined),
+                                    label: const Text('Clear unused storage'),
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                );
+        },
       ),
     );
   }
@@ -309,6 +313,22 @@ class ServersScreen extends ConsumerWidget {
       );
     }
   }
+}
+
+List<ServerModel> _mergeServerMetrics(
+  List<ServerModel> inventory,
+  ServerModel? live,
+) {
+  if (live == null) return inventory;
+  final items = [...inventory];
+  final index = items.indexWhere((item) =>
+      item.id == live.id || (item.host.isNotEmpty && item.host == live.host));
+  if (index < 0) {
+    items.insert(0, live);
+  } else {
+    items[index] = live;
+  }
+  return items;
 }
 
 class _NetworkValue extends StatelessWidget {

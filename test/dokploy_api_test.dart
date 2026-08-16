@@ -39,6 +39,27 @@ void main() {
     );
   });
 
+  test('uses the protected tRPC envelope for Traefik request logs', () async {
+    final adapter = _RecordingAdapter(
+      response: '{"result":{"data":{"json":{"data":[],"totalCount":7}}}}',
+    );
+    final api = DokployApi(
+      baseUrl: 'https://dokploy.example.com',
+      apiKey: 'test-token',
+      adapter: adapter,
+    );
+
+    final result = await api.traefikRequests(limit: 50) as Map;
+
+    expect(
+      adapter.request?.uri.path,
+      '/api/trpc/settings.readStatsLogs',
+    );
+    expect(result['totalCount'], 7);
+    final input = adapter.request?.uri.queryParameters['input'];
+    expect(input, contains('"pageSize":50'));
+  });
+
   group('Dokploy transport failure mapping', () {
     test('maps unauthorized responses without exposing request headers', () {
       final request = RequestOptions(
@@ -92,6 +113,9 @@ void main() {
 }
 
 class _RecordingAdapter implements HttpClientAdapter {
+  _RecordingAdapter({this.response = '[]'});
+
+  final String response;
   RequestOptions? request;
 
   @override
@@ -101,7 +125,7 @@ class _RecordingAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     request = options;
-    return ResponseBody.fromString('[]', 200, headers: {
+    return ResponseBody.fromString(response, 200, headers: {
       Headers.contentTypeHeader: [Headers.jsonContentType],
     });
   }

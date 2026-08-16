@@ -11,6 +11,9 @@ abstract interface class DokployRepository {
   Future<List<BackupModel>> backups();
   Future<List<ScheduleModel>> schedules();
   Future<List<DomainModel>> domains();
+  Future<TraefikRequestPage> traefikRequests({int limit = 200});
+  Stream<ServerModel> watchControlPlaneMetrics();
+  Stream<ServiceModel> watchServiceMetrics(ServiceModel service);
   Future<List<String>> logs(String serviceId, {int tail = 200});
   Future<List<String>> deploymentLogs(String deploymentId, {int tail = 500});
   Future<void> start(ServiceModel service);

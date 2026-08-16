@@ -33,6 +33,11 @@ class OperationsScreen extends ConsumerWidget {
           _nav(Icons.storage, 'Databases',
               'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', null,
               upcoming: true),
+          _nav(
+              Icons.swap_vert_rounded,
+              'Traefik requests',
+              'Live access log with HTTP status filters',
+              () => c.push('/traefik-requests')),
           const SectionTitle('Power tools'),
           _nav(Icons.terminal, 'Terminal',
               'Application / Compose / database shell (capability gated)', null,

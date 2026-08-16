@@ -47,6 +47,16 @@ final deploymentsProvider = FutureProvider(
 final serversProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).servers(),
 );
+final liveControlPlaneMetricsProvider = StreamProvider.autoDispose(
+  (ref) => ref.watch(repositoryProvider).watchControlPlaneMetrics(),
+);
+final liveServiceMetricsProvider =
+    StreamProvider.autoDispose.family<ServiceModel, ServiceModel>(
+  (ref, service) => ref.watch(repositoryProvider).watchServiceMetrics(service),
+);
+final traefikRequestsProvider = FutureProvider(
+  (ref) => ref.watch(repositoryProvider).traefikRequests(),
+);
 final backupsProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).backups(),
 );

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/local_notifications.dart';
+import 'core/live_data_coordinator.dart';
 import 'core/notification_coordinator.dart';
 import 'core/providers.dart';
 import 'core/router.dart';
@@ -17,6 +18,7 @@ class DokployMobileApp extends ConsumerStatefulWidget {
 
 class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
   late final NotificationCoordinator _coordinator;
+  late final LiveDataCoordinator _liveData;
   StreamSubscription<String>? _routeSubscription;
 
   @override
@@ -28,6 +30,17 @@ class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
       onHistoryChanged: () {
         final id = ref.read(currentInstanceProvider).id;
         ref.invalidate(notificationHistoryProvider(id));
+      },
+    )..start();
+    _liveData = LiveDataCoordinator(
+      onRefresh: ({required includeInfrastructure}) {
+        if (!mounted) return;
+        ref.invalidate(dashboardProvider);
+        ref.invalidate(servicesProvider);
+        ref.invalidate(deploymentsProvider);
+        ref.invalidate(serviceDetailProvider);
+        ref.invalidate(traefikRequestsProvider);
+        if (includeInfrastructure) ref.invalidate(serversProvider);
       },
     )..start();
     _routeSubscription =
@@ -42,6 +55,7 @@ class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
   void dispose() {
     _routeSubscription?.cancel();
     _coordinator.dispose();
+    _liveData.dispose();
     super.dispose();
   }
 
@@ -49,6 +63,9 @@ class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
   Widget build(BuildContext context) {
     final instance = ref.watch(currentInstanceProvider);
     final repository = ref.watch(repositoryProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _liveData.configure(enabled: !instance.demo);
+    });
     final preferences =
         ref.watch(notificationPreferencesProvider(instance.id)).valueOrNull;
     if (preferences != null) {

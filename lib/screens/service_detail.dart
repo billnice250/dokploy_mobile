@@ -36,7 +36,19 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
       );
     }
     final detail = ref.watch(serviceDetailProvider(listedService));
-    final service = detail.valueOrNull ?? listedService;
+    final detailedService = detail.valueOrNull ?? listedService;
+    final liveMetrics =
+        ref.watch(liveServiceMetricsProvider(detailedService)).valueOrNull;
+    final service = liveMetrics == null || !liveMetrics.metricsAvailable
+        ? detailedService
+        : detailedService.copyWith(
+            cpu: liveMetrics.cpu,
+            memoryMb: liveMetrics.memoryMb,
+            networkReceivedMb: liveMetrics.networkReceivedMb,
+            networkSentMb: liveMetrics.networkSentMb,
+            metricsAvailable: liveMetrics.metricsAvailable,
+            metricsUpdatedAt: liveMetrics.metricsUpdatedAt,
+          );
     final lifecycleAvailable =
         capabilities?.lifecycle == true && _supportsLifecycle(service.kind);
     return Scaffold(

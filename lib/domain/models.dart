@@ -38,6 +38,7 @@ class CapabilitySet {
     this.domains = false,
     this.terminal = false,
     this.databases = false,
+    this.traefikRequests = false,
   });
 
   static const core = CapabilitySet(compose: true, databases: true);
@@ -54,6 +55,7 @@ class CapabilitySet {
     schedules: true,
     domains: true,
     databases: true,
+    traefikRequests: true,
   );
 
   final bool logs,
@@ -67,7 +69,8 @@ class CapabilitySet {
       schedules,
       domains,
       terminal,
-      databases;
+      databases,
+      traefikRequests;
 }
 
 class ProjectModel {
@@ -104,6 +107,13 @@ class ServiceModel {
   final double cpu, memoryMb, networkReceivedMb, networkSentMb;
   final bool metricsAvailable;
   final DateTime? metricsUpdatedAt;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is ServiceModel && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 
   ServiceModel copyWith({
     String? name,
@@ -271,6 +281,38 @@ class DomainModel {
   final String id, host, target;
   final bool https;
   final int port;
+}
+
+class TraefikRequestModel {
+  const TraefikRequestModel({
+    required this.timestamp,
+    required this.method,
+    required this.host,
+    required this.path,
+    required this.statusCode,
+    this.durationMs = 0,
+    this.clientHost = '',
+    this.router = '',
+    this.service = '',
+    this.protocol = '',
+  });
+
+  final DateTime timestamp;
+  final String method, host, path, clientHost, router, service, protocol;
+  final int statusCode;
+  final double durationMs;
+}
+
+class TraefikRequestPage {
+  const TraefikRequestPage({
+    required this.enabled,
+    required this.items,
+    required this.totalCount,
+  });
+
+  final bool enabled;
+  final List<TraefikRequestModel> items;
+  final int totalCount;
 }
 
 class DashboardSnapshot {

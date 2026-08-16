@@ -14,6 +14,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(dashboardProvider);
+    final servers = ref.watch(serversProvider);
+    final liveServer = ref.watch(liveControlPlaneMetricsProvider).valueOrNull;
     final instance = ref.watch(currentInstanceProvider);
     final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     final notifications =
@@ -89,6 +91,11 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 data: (snapshot) => _DashboardContent(
                   snapshot: snapshot,
+                  servers: _mergeServers(
+                    servers.valueOrNull ?? snapshot.servers,
+                    liveServer,
+                  ),
+                  serversLoading: servers.isLoading,
                   instance: instance,
                   capabilities: capabilities,
                 ),
@@ -104,11 +111,15 @@ class DashboardScreen extends ConsumerWidget {
 class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.snapshot,
+    required this.servers,
+    required this.serversLoading,
     required this.instance,
     required this.capabilities,
   });
 
   final DashboardSnapshot snapshot;
+  final List<ServerModel> servers;
+  final bool serversLoading;
   final DokployInstance instance;
   final CapabilitySet? capabilities;
 
@@ -176,13 +187,14 @@ class _DashboardContent extends StatelessWidget {
                 child: const Text('All servers'),
               ),
             ),
-            if (snapshot.servers.isEmpty)
+            if (servers.isEmpty && serversLoading)
+              const GlassPanel(child: LinearProgressIndicator(minHeight: 2))
+            else if (servers.isEmpty)
               const _EmptyPanel(
-                icon: Icons.monitor_heart_outlined,
-                label: 'No server inventory returned',
-              )
+                  icon: Icons.monitor_heart_outlined,
+                  label: 'No server inventory returned')
             else
-              ...snapshot.servers.take(3).map(
+              ...servers.take(3).map(
                     (server) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _ServerCard(server),
@@ -191,6 +203,22 @@ class _DashboardContent extends StatelessWidget {
           ],
         ],
       );
+}
+
+List<ServerModel> _mergeServers(
+  List<ServerModel> inventory,
+  ServerModel? live,
+) {
+  if (live == null) return inventory;
+  final items = [...inventory];
+  final index = items.indexWhere((item) =>
+      item.id == live.id || (item.host.isNotEmpty && item.host == live.host));
+  if (index < 0) {
+    items.insert(0, live);
+  } else {
+    items[index] = live;
+  }
+  return items;
 }
 
 class _HealthHero extends StatelessWidget {
@@ -372,6 +400,11 @@ class _QuickActions extends StatelessWidget {
               icon: Icons.subject,
               label: 'Logs',
               onTap: () => context.go('/projects'),
+            ),
+            _QuickAction(
+              icon: Icons.swap_vert_rounded,
+              label: 'Requests',
+              onTap: () => context.push('/traefik-requests'),
             ),
             _QuickAction(
               icon: Icons.dns_outlined,

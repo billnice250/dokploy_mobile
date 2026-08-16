@@ -280,4 +280,35 @@ class MockDokployRepository implements DokployRepository {
   Future<void> setupMonitoring({String? serverId}) async {}
   @override
   Future<void> pruneDocker({String? serverId}) async {}
+
+  @override
+  Future<TraefikRequestPage> traefikRequests({int limit = 200}) async {
+    final items = List.generate(
+      18,
+      (index) => TraefikRequestModel(
+        timestamp: now.subtract(Duration(seconds: index * 19)),
+        method: index % 5 == 0 ? 'POST' : 'GET',
+        host: index.isEven ? 'api.example.com' : 'media.example.com',
+        path: index % 4 == 0 ? '/api/deployments' : '/health',
+        statusCode: const [200, 200, 201, 301, 404, 502][index % 6],
+        durationMs: 18 + index * 7,
+        clientHost: '10.0.0.${index + 2}',
+        router: 'demo-router@file',
+        service: 'demo-service@file',
+        protocol: 'HTTP/2.0',
+      ),
+    );
+    return TraefikRequestPage(
+      enabled: true,
+      items: items.take(limit).toList(),
+      totalCount: items.length,
+    );
+  }
+
+  @override
+  Stream<ServerModel> watchControlPlaneMetrics() => const Stream.empty();
+
+  @override
+  Stream<ServiceModel> watchServiceMetrics(ServiceModel service) =>
+      Stream.value(service);
 }

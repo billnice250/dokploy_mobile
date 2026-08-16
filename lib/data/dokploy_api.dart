@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/io.dart';
 
 import '../domain/failures.dart';
 
@@ -14,6 +16,8 @@ class DokployApi {
     required String apiKey,
     HttpClientAdapter? adapter,
   })  : monitoringCallbackUrl = _monitoringCallbackUrl(baseUrl),
+        _baseUri = Uri.parse(baseUrl.trim()),
+        _apiKey = apiKey.trim(),
         _dio = Dio(
           BaseOptions(
             baseUrl: _apiBaseUrl(baseUrl),
@@ -34,6 +38,8 @@ class DokployApi {
   }
 
   final Dio _dio;
+  final Uri _baseUri;
+  final String _apiKey;
 
   /// Public callback consumed by Dokploy's monitoring sidecar for threshold
   /// events. This must be an absolute URL even when thresholds are disabled.
@@ -75,6 +81,7 @@ class DokployApi {
   }
 
   Future<dynamic> projects() => get('project.all');
+  Future<dynamic> overviewServices() => get('overview.services');
   Future<dynamic> permissions() => get('user.getPermissions');
   Future<dynamic> homeStats() => get('project.homeStats');
   Future<dynamic> project(String id) => get('project.one', {'projectId': id});
@@ -118,6 +125,10 @@ class DokployApi {
       post('deployment.killProcess', {'deploymentId': id});
 
   Future<dynamic> servers() => get('server.all');
+  Future<dynamic> serverHealth({String? serverId}) => get(
+        'docker.getServerHealth',
+        {if (serverId != null && serverId.isNotEmpty) 'serverId': serverId},
+      );
   Future<dynamic> metricsConfig() => get('user.getMetricsToken');
   Future<dynamic> serverMetrics({
     required String url,
@@ -145,6 +156,70 @@ class DokployApi {
         'settings.cleanDockerPrune',
         {if (serverId != null) 'serverId': serverId},
       );
+
+  Future<dynamic> requestsActive() => get('settings.haveActivateRequests');
+
+  /// readStatsLogs is intentionally omitted from Dokploy's generated OpenAPI
+  /// document. It remains a protected tRPC query used by Dokploy's own
+  /// Requests screen, so use the standard tRPC envelope here.
+  Future<dynamic> traefikRequests({int limit = 200}) async {
+    final input = {
+      'page': {'pageIndex': 0, 'pageSize': limit.clamp(1, 500)},
+      'sort': {'id': 'time', 'desc': true},
+    };
+    final raw = await get(
+      'trpc/settings.readStatsLogs',
+      {
+        'input': jsonEncode({'json': input})
+      },
+    );
+    if (raw is Map) {
+      final result = raw['result'];
+      if (result is Map) {
+        final data = result['data'];
+        if (data is Map && data.containsKey('json')) return data['json'];
+      }
+    }
+    return raw;
+  }
+
+  Stream<dynamic> dockerStats({
+    required String appName,
+    String appType = 'application',
+    String? serviceId,
+  }) async* {
+    final scheme = _baseUri.scheme == 'https' ? 'wss' : 'ws';
+    final uri = _baseUri.replace(
+      scheme: scheme,
+      path: '/listen-docker-stats-monitoring',
+      queryParameters: {
+        'appName': appName,
+        'appType': appType,
+        if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
+      },
+      fragment: null,
+    );
+    final channel = IOWebSocketChannel.connect(
+      uri,
+      headers: {'x-api-key': _apiKey},
+      pingInterval: const Duration(seconds: 20),
+      connectTimeout: const Duration(seconds: 10),
+    );
+    try {
+      await channel.ready;
+      await for (final message in channel.stream) {
+        if (message is String) yield jsonDecode(message);
+      }
+    } on WebSocketException catch (error) {
+      throw DokployFailure(
+        kind: DokployFailureKind.connectionFailed,
+        operation: 'listen-docker-stats-monitoring',
+        message: error.message,
+      );
+    } finally {
+      await channel.sink.close();
+    }
+  }
 
   Future<dynamic> postgres(String id) =>
       get('postgres.one', {'postgresId': id});
