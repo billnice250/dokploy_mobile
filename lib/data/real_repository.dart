@@ -812,6 +812,88 @@ class RealDokployRepository implements DokployRepository {
   }
 
   @override
+  Future<List<ContainerInstance>> containers(ServiceModel service) async {
+    if (service.appName.isEmpty) return const [];
+    Future<List<ContainerInstance>> load({required bool swarm}) async {
+      try {
+        final raw = swarm
+            ? await api.swarmContainers(
+                appName: service.appName,
+                stack: service.kind == ServiceKind.compose,
+                serverId: service.serverId,
+              )
+            : await api.containersByAppName(
+                appName: service.appName,
+                appType: service.kind == ServiceKind.compose
+                    ? 'docker-compose'
+                    : null,
+                serverId: service.serverId,
+              );
+        return _list(raw)
+            .whereType<Map>()
+            .map((item) {
+              final currentState = _s(item, ['currentState', 'status']);
+              return ContainerInstance(
+                id: _s(item, ['containerId', 'id']),
+                name: _s(item, ['name'], 'Container'),
+                state: _s(item, ['state'], 'unknown').toLowerCase(),
+                runType: swarm ? 'swarm' : 'native',
+                node: _s(item, ['node']),
+                status: currentState,
+              );
+            })
+            .where((item) => item.id.isNotEmpty)
+            .toList();
+      } on DokployFailure {
+        return const [];
+      }
+    }
+
+    final groups = await Future.wait([
+      load(swarm: false),
+      load(swarm: true),
+    ]);
+    final unique = <String, ContainerInstance>{};
+    for (final item in groups.expand((group) => group)) {
+      unique['${item.runType}:${item.id}'] = item;
+    }
+    final result = unique.values.toList()
+      ..sort((a, b) {
+        if (a.running != b.running) return a.running ? -1 : 1;
+        return b.name.compareTo(a.name);
+      });
+    return result;
+  }
+
+  @override
+  Stream<List<String>> watchContainerLogs(
+    ServiceModel service,
+    ContainerInstance container, {
+    int tail = 200,
+  }) async* {
+    final lines = <String>[];
+    var remainder = '';
+    await for (final chunk in api.containerLogs(
+      containerId: container.id,
+      runType: container.runType,
+      serviceId: service.id,
+      serverId: service.serverId,
+      tail: tail,
+    )) {
+      final parts = '$remainder$chunk'.replaceAll('\r', '').split('\n');
+      remainder = parts.removeLast();
+      lines.addAll(parts.where((line) => line.isNotEmpty));
+      if (lines.length > tail) lines.removeRange(0, lines.length - tail);
+      yield List.unmodifiable(lines);
+    }
+    if (remainder.isNotEmpty) {
+      lines.add(remainder);
+      if (lines.length > tail) lines.removeRange(0, lines.length - tail);
+      yield List.unmodifiable(lines);
+    }
+  }
+
+  @override
   Future<List<String>> deploymentLogs(String deploymentId,
       {int tail = 500}) async {
     if (!(await capabilities()).deployments) {

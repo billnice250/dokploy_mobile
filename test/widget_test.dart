@@ -255,7 +255,42 @@ void main() {
     await tester.pump();
 
     expect(find.text('Unsaved environment changes'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pump();
+    expect(find.text('Unsaved environment changes'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Every variable needs a key.'),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('Every variable needs a key.'), findsOneWidget);
+  });
+
+  testWidgets('replica selector changes the live container log source',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => _MetricRepository()),
+        ],
+        child: const MaterialApp(
+          home: ServiceDetailScreen(serviceId: 'ollama'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('a1b2c3d4e5f6'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('f6e5d4c3b2a1').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Logs'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('f6e5d4c3b2a1 ready'), findsOneWidget);
   });
 }
 

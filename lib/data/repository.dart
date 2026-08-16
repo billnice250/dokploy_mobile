@@ -14,6 +14,12 @@ abstract interface class DokployRepository {
   Future<TraefikRequestPage> traefikRequests({int limit = 200});
   Stream<ServerModel> watchControlPlaneMetrics();
   Stream<ServiceModel> watchServiceMetrics(ServiceModel service);
+  Future<List<ContainerInstance>> containers(ServiceModel service);
+  Stream<List<String>> watchContainerLogs(
+    ServiceModel service,
+    ContainerInstance container, {
+    int tail = 200,
+  });
   Future<List<String>> logs(String serviceId, {int tail = 200});
   Future<List<String>> deploymentLogs(String deploymentId, {int tail = 500});
   Future<void> start(ServiceModel service);

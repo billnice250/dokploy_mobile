@@ -261,6 +261,33 @@ class MockDokployRepository implements DokployRepository {
       (i) =>
           '${now.subtract(Duration(seconds: 80 - i)).toIso8601String()}  ${i % 11 == 0 ? 'WARN' : 'INFO'}  ${i % 7 == 0 ? 'GET /api/health 200' : 'Application heartbeat ok'}');
   @override
+  Future<List<ContainerInstance>> containers(ServiceModel service) async =>
+      const [
+        ContainerInstance(
+          id: 'a1b2c3d4e5f6',
+          name: 'app.1',
+          state: 'running',
+          runType: 'native',
+        ),
+        ContainerInstance(
+          id: 'f6e5d4c3b2a1',
+          name: 'app.2',
+          state: 'shutdown',
+          runType: 'swarm',
+          node: 'worker-1',
+          status: 'Shutdown 10 seconds ago',
+        ),
+      ];
+  @override
+  Stream<List<String>> watchContainerLogs(
+    ServiceModel service,
+    ContainerInstance container, {
+    int tail = 200,
+  }) =>
+      Stream.value([
+        '${now.toIso8601String()} INFO ${container.id} ready',
+      ]);
+  @override
   Future<List<String>> deploymentLogs(String deploymentId,
           {int tail = 500}) async =>
       List.generate(

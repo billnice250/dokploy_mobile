@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,8 +23,25 @@ class ServiceDetailScreen extends ConsumerStatefulWidget {
 
 class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
   int tab = 0;
+  String? _selectedContainerKey;
+  Timer? _containerRefreshTimer;
   HealthState? _optimisticStatus;
   DateTime? _optimisticStatusUntil;
+
+  @override
+  void initState() {
+    super.initState();
+    _containerRefreshTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => ref.invalidate(serviceContainersProvider),
+    );
+  }
+
+  @override
+  void dispose() {
+    _containerRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +85,13 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
             metricsAvailable: liveMetrics.metricsAvailable,
             metricsUpdatedAt: liveMetrics.metricsUpdatedAt,
           );
+    final containerRequest = ref.watch(serviceContainersProvider(service));
+    final containers =
+        containerRequest.valueOrNull ?? const <ContainerInstance>[];
+    final selectedContainer = containers
+            .where((item) => _containerKey(item) == _selectedContainerKey)
+            .firstOrNull ??
+        containers.firstOrNull;
     final lifecycleAvailable =
         capabilities?.lifecycle == true && _supportsLifecycle(service.kind);
     return Scaffold(
@@ -126,6 +152,14 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
               NavigationDestination(icon: Icon(Icons.tune), label: 'Config'),
             ],
           ),
+          _ContainerSelector(
+            containers: containers,
+            selected: selectedContainer,
+            loading: containerRequest.isLoading,
+            onSelected: (value) => setState(
+              () => _selectedContainerKey = _containerKey(value),
+            ),
+          ),
           Expanded(
             child: switch (tab) {
               0 => _Overview(
@@ -135,7 +169,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                   onRefresh: () =>
                       ref.invalidate(serviceDetailProvider(listedService)),
                 ),
-              1 => _Logs(service: service),
+              1 => _Logs(service: service, container: selectedContainer),
               2 => _Deploys(serviceId: service.id),
               _ => _Config(service),
             },
@@ -436,10 +470,98 @@ String _relativeTime(DateTime timestamp) {
   return '${difference.inDays} days ago';
 }
 
+String _containerKey(ContainerInstance container) =>
+    '${container.runType}:${container.id}';
+
+class _ContainerSelector extends StatelessWidget {
+  const _ContainerSelector({
+    required this.containers,
+    required this.selected,
+    required this.loading,
+    required this.onSelected,
+  });
+
+  final List<ContainerInstance> containers;
+  final ContainerInstance? selected;
+  final bool loading;
+  final ValueChanged<ContainerInstance> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && containers.isEmpty) {
+      return const LinearProgressIndicator(minHeight: 2);
+    }
+    if (containers.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Text(
+          'No containers currently reported',
+          style: TextStyle(color: DokployTheme.muted, fontSize: 12),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: DropdownButtonFormField<String>(
+        key: ValueKey(selected == null ? 'none' : _containerKey(selected!)),
+        initialValue: selected == null ? null : _containerKey(selected!),
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: 'Container',
+          prefixIcon: Icon(Icons.dns_outlined),
+          isDense: true,
+        ),
+        items: [
+          for (final container in containers)
+            DropdownMenuItem(
+              value: _containerKey(container),
+              child: Row(
+                children: [
+                  StatusDot(
+                    container.running
+                        ? HealthState.healthy
+                        : HealthState.stopped,
+                    size: 7,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${container.name}  •  ${container.id}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontFamily: 'monospace'),
+                    ),
+                  ),
+                  if (container.node.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      container.node,
+                      style: const TextStyle(
+                        color: DokployTheme.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+        onChanged: (key) {
+          if (key == null) return;
+          final value = containers
+              .where((container) => _containerKey(container) == key)
+              .firstOrNull;
+          if (value != null) onSelected(value);
+        },
+      ),
+    );
+  }
+}
+
 class _Logs extends ConsumerStatefulWidget {
-  const _Logs({required this.service});
+  const _Logs({required this.service, required this.container});
 
   final ServiceModel service;
+  final ContainerInstance? container;
 
   @override
   ConsumerState<_Logs> createState() => _LogsState();
@@ -450,22 +572,51 @@ class _LogsState extends ConsumerState<_Logs> {
   String search = '';
   _LogStatus status = _LogStatus.all;
   Future<List<String>>? request;
+  Stream<List<String>>? liveRequest;
 
   Future<List<String>> _load() =>
       ref.read(repositoryProvider).logs(widget.service.id, tail: tail);
 
-  void _reload() => setState(() => request = _load());
+  @override
+  void initState() {
+    super.initState();
+    _resetRequest();
+  }
+
+  @override
+  void didUpdateWidget(covariant _Logs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.container?.id != widget.container?.id ||
+        oldWidget.container?.runType != widget.container?.runType) {
+      _resetRequest();
+    }
+  }
+
+  void _resetRequest() {
+    final container = widget.container;
+    if (container == null) {
+      liveRequest = null;
+      request = _load();
+    } else {
+      request = null;
+      liveRequest = ref.read(repositoryProvider).watchContainerLogs(
+            widget.service,
+            container,
+            tail: tail,
+          );
+    }
+  }
+
+  void _reload() => setState(_resetRequest);
 
   @override
   Widget build(BuildContext context) {
     final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
-    if (capabilities?.logs == false ||
-        widget.service.kind != ServiceKind.application) {
+    if (capabilities?.logs == false) {
       return const Center(
         child: Text('Logs are unavailable for this service.'),
       );
     }
-    request ??= _load();
     return Column(
       children: [
         Padding(
@@ -523,57 +674,72 @@ class _LogsState extends ConsumerState<_Logs> {
           ),
         ),
         Expanded(
-          child: FutureBuilder<List<String>>(
-            future: request,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return Center(
-                    child: Text('Could not load logs: ${snapshot.error}'));
-              }
-              final lines = (snapshot.data ?? const <String>[])
-                  .where((line) =>
-                      search.isEmpty || line.toLowerCase().contains(search))
-                  .where((line) =>
-                      status == _LogStatus.all || _logStatus(line) == status)
-                  .toList();
-              return Container(
-                color: const Color(0xFF070708),
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(14),
-                  itemCount: lines.length,
-                  itemBuilder: (context, index) => GestureDetector(
-                    onLongPress: () async {
-                      await Clipboard.setData(
-                          ClipboardData(text: lines[index]));
-                      if (context.mounted) {
-                        DployGoNotice.show(
-                          context,
-                          message: 'Log line copied.',
-                          tone: DployGoNoticeTone.success,
-                        );
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: SelectableText(
-                        lines[index],
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12.2,
-                          color: _logColor(lines[index]),
-                        ),
-                      ),
-                    ),
+          child: liveRequest == null
+              ? FutureBuilder<List<String>>(
+                  future: request,
+                  builder: (context, snapshot) => _logResult(
+                    snapshot.connectionState,
+                    snapshot.data,
+                    snapshot.error,
+                  ),
+                )
+              : StreamBuilder<List<String>>(
+                  stream: liveRequest,
+                  builder: (context, snapshot) => _logResult(
+                    snapshot.connectionState,
+                    snapshot.data,
+                    snapshot.error,
                   ),
                 ),
-              );
-            },
-          ),
         ),
       ],
+    );
+  }
+
+  Widget _logResult(
+    ConnectionState connection,
+    List<String>? data,
+    Object? error,
+  ) {
+    if (error != null) {
+      return Center(child: Text('Could not load logs: $error'));
+    }
+    if (data == null && connection == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final lines = (data ?? const <String>[])
+        .where((line) => search.isEmpty || line.toLowerCase().contains(search))
+        .where((line) => status == _LogStatus.all || _logStatus(line) == status)
+        .toList();
+    return Container(
+      color: const Color(0xFF070708),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(14),
+        itemCount: lines.length,
+        itemBuilder: (context, index) => GestureDetector(
+          onLongPress: () async {
+            await Clipboard.setData(ClipboardData(text: lines[index]));
+            if (context.mounted) {
+              DployGoNotice.show(
+                context,
+                message: 'Log line copied.',
+                tone: DployGoNoticeTone.success,
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: SelectableText(
+              lines[index],
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.2,
+                color: _logColor(lines[index]),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -838,145 +1004,161 @@ class _ConfigState extends ConsumerState<_Config> {
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
+  Widget build(BuildContext context) => Column(
         children: [
-          const Text(
-            'Configuration',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          if (!_revealed)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.key_outlined),
-                title: const Text('Environment variables'),
-                subtitle: const Text(
-                  'Values are protected by biometric confirmation and never written to app logs.',
-                ),
-                trailing: FilledButton.tonalIcon(
-                  onPressed: _reveal,
-                  icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('Reveal'),
-                ),
-              ),
-            )
-          else ...[
-            Row(
+          if (_hasChanges) _pinnedChangeBanner(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                const Expanded(
-                  child: Text(
-                    'Environment variables',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                const Text(
+                  'Configuration',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
-                TextButton.icon(
-                  onPressed: _requestHide,
-                  icon: const Icon(Icons.visibility_off_outlined),
-                  label: const Text('Hide'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_loading)
-              const Center(child: CircularProgressIndicator())
-            else if (_error != null)
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.error_outline),
-                  title: const Text('Could not load environment'),
-                  subtitle: Text('$_error'),
-                  trailing: IconButton(
-                    onPressed: _reveal,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                ),
-              )
-            else ...[
-              if (_hasChanges)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: DokployTheme.warning.withValues(alpha: .10),
-                    border: Border.all(
-                      color: DokployTheme.warning.withValues(alpha: .45),
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: DokployTheme.warning,
+                const SizedBox(height: 12),
+                if (!_revealed)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.key_outlined),
+                      title: const Text('Environment variables'),
+                      subtitle: const Text(
+                        'Values are protected by biometric confirmation and never written to app logs.',
                       ),
-                      SizedBox(width: 10),
-                      Expanded(
+                      trailing: FilledButton.tonalIcon(
+                        onPressed: _reveal,
+                        icon: const Icon(Icons.visibility_outlined),
+                        label: const Text('Reveal'),
+                      ),
+                    ),
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      const Expanded(
                         child: Text(
-                          'Unsaved environment changes',
+                          'Environment variables',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
+                      TextButton.icon(
+                        onPressed: _requestHide,
+                        icon: const Icon(Icons.visibility_off_outlined),
+                        label: const Text('Hide'),
+                      ),
                     ],
                   ),
-                ),
-              for (var index = 0; index < _rows.length; index++)
-                _environmentRow(_rows[index], index),
-              if (_rows.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: Text(
-                      'No environment variables configured.',
-                      style: TextStyle(color: DokployTheme.muted),
+                  const SizedBox(height: 8),
+                  if (_loading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_error != null)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.error_outline),
+                        title: const Text('Could not load environment'),
+                        subtitle: Text('$_error'),
+                        trailing: IconButton(
+                          onPressed: _reveal,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ),
+                    )
+                  else ...[
+                    for (var index = 0; index < _rows.length; index++)
+                      _environmentRow(_rows[index], index),
+                    if (_rows.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: Text(
+                            'No environment variables configured.',
+                            style: TextStyle(color: DokployTheme.muted),
+                          ),
+                        ),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () => setState(
+                        () => _rows.add(_EnvironmentRow()),
+                      ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add variable'),
                     ),
-                  ),
-                ),
-              OutlinedButton.icon(
-                onPressed: () => setState(
-                  () => _rows.add(_EnvironmentRow()),
-                ),
-                icon: const Icon(Icons.add),
-                label: const Text('Add variable'),
-              ),
-              if (_preservedLines.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  '${_preservedLines.length} comment or advanced line(s) are preserved unchanged.',
-                  style: const TextStyle(
-                    color: DokployTheme.muted,
-                    fontSize: 12,
-                  ),
-                ),
+                    if (_preservedLines.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        '${_preservedLines.length} comment or advanced line(s) are preserved unchanged.',
+                        style: const TextStyle(
+                          color: DokployTheme.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    if (_validationMessage case final message?) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        message,
+                        style: const TextStyle(color: DokployTheme.danger),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Saving does not restart the service. Apply changes with Restart or Redeploy.',
+                      style: TextStyle(color: DokployTheme.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed:
+                          _saving || !_hasChanges || _validationMessage != null
+                              ? null
+                              : _save,
+                      icon: _saving
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(_saving ? 'Saving…' : 'Save environment'),
+                    ),
+                  ],
+                ],
               ],
-              if (_validationMessage case final message?) ...[
-                const SizedBox(height: 10),
-                Text(
-                  message,
-                  style: const TextStyle(color: DokployTheme.danger),
-                ),
-              ],
-              const SizedBox(height: 10),
-              const Text(
-                'Saving does not restart the service. Apply changes with Restart or Redeploy.',
-                style: TextStyle(color: DokployTheme.muted, fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _saving || !_hasChanges || _validationMessage != null
-                    ? null
-                    : _save,
-                icon: _saving
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(_saving ? 'Saving…' : 'Save environment'),
-              ),
-            ],
-          ],
+            ),
+          ),
         ],
+      );
+
+  Widget _pinnedChangeBanner() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: DokployTheme.warning.withValues(alpha: .12),
+          border: Border.all(
+            color: DokployTheme.warning.withValues(alpha: .55),
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .22),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: DokployTheme.warning,
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Unsaved environment changes',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
       );
 
   Widget _environmentRow(_EnvironmentRow row, int index) => Card(

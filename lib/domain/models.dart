@@ -40,6 +40,26 @@ class ServiceEnvironment {
       );
 }
 
+class ContainerInstance {
+  const ContainerInstance({
+    required this.id,
+    required this.name,
+    required this.state,
+    required this.runType,
+    this.node = '',
+    this.status = '',
+  });
+
+  final String id;
+  final String name;
+  final String state;
+  final String runType;
+  final String node;
+  final String status;
+
+  bool get running => state.toLowerCase() == 'running';
+}
+
 class DokployInstance {
   const DokployInstance(
       {required this.id,

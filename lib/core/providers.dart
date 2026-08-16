@@ -54,6 +54,10 @@ final liveServiceMetricsProvider =
     StreamProvider.autoDispose.family<ServiceModel, ServiceModel>(
   (ref, service) => ref.watch(repositoryProvider).watchServiceMetrics(service),
 );
+final serviceContainersProvider =
+    FutureProvider.autoDispose.family<List<ContainerInstance>, ServiceModel>(
+  (ref, service) => ref.watch(repositoryProvider).containers(service),
+);
 final traefikRequestsProvider = FutureProvider(
   (ref) => ref.watch(repositoryProvider).traefikRequests(),
 );

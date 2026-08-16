@@ -172,6 +172,32 @@ class DokployApi {
 
   Future<dynamic> requestsActive() => get('settings.haveActivateRequests');
 
+  Future<dynamic> containersByAppName({
+    required String appName,
+    String? appType,
+    String? serverId,
+  }) =>
+      get('docker.getContainersByAppNameMatch', {
+        'appName': appName,
+        if (appType != null) 'appType': appType,
+        if (serverId != null && serverId.isNotEmpty) 'serverId': serverId,
+      });
+
+  Future<dynamic> swarmContainers({
+    required String appName,
+    required bool stack,
+    String? serverId,
+  }) =>
+      get(
+        stack
+            ? 'docker.getStackContainersByAppName'
+            : 'docker.getServiceContainersByAppName',
+        {
+          'appName': appName,
+          if (serverId != null && serverId.isNotEmpty) 'serverId': serverId,
+        },
+      );
+
   /// readStatsLogs is intentionally omitted from Dokploy's generated OpenAPI
   /// document. It remains a protected tRPC query used by Dokploy's own
   /// Requests screen, so use the standard tRPC envelope here.
@@ -227,6 +253,49 @@ class DokployApi {
       throw DokployFailure(
         kind: DokployFailureKind.connectionFailed,
         operation: 'listen-docker-stats-monitoring',
+        message: error.message,
+      );
+    } finally {
+      await channel.sink.close();
+    }
+  }
+
+  Stream<String> containerLogs({
+    required String containerId,
+    required String runType,
+    required String serviceId,
+    String? serverId,
+    int tail = 200,
+  }) async* {
+    final scheme = _baseUri.scheme == 'https' ? 'wss' : 'ws';
+    final uri = _baseUri.replace(
+      scheme: scheme,
+      path: '/docker-container-logs',
+      queryParameters: {
+        'containerId': containerId,
+        'tail': '${tail.clamp(1, 10000)}',
+        'since': 'all',
+        'runType': runType,
+        'serviceId': serviceId,
+        if (serverId != null && serverId.isNotEmpty) 'serverId': serverId,
+      },
+      fragment: null,
+    );
+    final channel = IOWebSocketChannel.connect(
+      uri,
+      headers: {'x-api-key': _apiKey},
+      pingInterval: const Duration(seconds: 20),
+      connectTimeout: const Duration(seconds: 10),
+    );
+    try {
+      await channel.ready;
+      await for (final message in channel.stream) {
+        if (message is String) yield message;
+      }
+    } on WebSocketException catch (error) {
+      throw DokployFailure(
+        kind: DokployFailureKind.connectionFailed,
+        operation: 'docker-container-logs',
         message: error.message,
       );
     } finally {
