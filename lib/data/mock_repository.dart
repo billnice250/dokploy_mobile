@@ -273,7 +273,19 @@ class MockDokployRepository implements DokployRepository {
   @override
   Future<void> stop(ServiceModel service) async {}
   @override
+  Future<void> restart(ServiceModel service) async {}
+  @override
   Future<void> redeploy(ServiceModel service) async {}
+  @override
+  Future<ServiceEnvironment> environment(ServiceModel service) async =>
+      const ServiceEnvironment(
+        env: 'APP_ENV=production\nAPI_URL=https://api.example.com',
+      );
+  @override
+  Future<void> saveEnvironment(
+    ServiceModel service,
+    ServiceEnvironment environment,
+  ) async {}
   @override
   Future<void> cancelDeployment(String deploymentId) async {}
   @override

@@ -10,6 +10,28 @@ enum ServiceKind {
 
 enum HealthState { healthy, warning, failed, stopped, deploying, unknown }
 
+class ServiceEnvironment {
+  const ServiceEnvironment({
+    this.env = '',
+    this.buildArgs,
+    this.buildSecrets,
+    this.createEnvFile = false,
+  });
+
+  final String env;
+  final String? buildArgs;
+  final String? buildSecrets;
+  final bool createEnvFile;
+
+  ServiceEnvironment copyWith({String? env, bool? createEnvFile}) =>
+      ServiceEnvironment(
+        env: env ?? this.env,
+        buildArgs: buildArgs,
+        buildSecrets: buildSecrets,
+        createEnvFile: createEnvFile ?? this.createEnvFile,
+      );
+}
+
 class DokployInstance {
   const DokployInstance(
       {required this.id,

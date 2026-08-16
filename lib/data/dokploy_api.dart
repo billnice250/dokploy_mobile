@@ -101,6 +101,19 @@ class DokployApi {
   Future<void> redeployApplication(String id) async =>
       post('application.redeploy', {'applicationId': id});
 
+  Future<dynamic> serviceConfiguration(
+    String resource,
+    String idKey,
+    String id,
+  ) =>
+      get('$resource.one', {idKey: id});
+
+  Future<void> saveServiceEnvironment(
+    String resource,
+    Map<String, dynamic> payload,
+  ) async =>
+      post('$resource.saveEnvironment', payload);
+
   Future<dynamic> compose(String id) => get('compose.one', {'composeId': id});
   Future<dynamic> composeServices(String id) =>
       get('compose.loadServices', {'composeId': id});

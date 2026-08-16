@@ -144,6 +144,59 @@ void main() {
     expect(deployment.finishedAt, isNull);
   });
 
+  test('preserves application build settings when saving environment',
+      () async {
+    final api = _FakeApi(
+      applicationPayload: const {
+        'env': 'TOKEN=old',
+        'buildArgs': 'FLAVOR=production',
+        'buildSecrets': 'NPM_TOKEN=secret',
+        'createEnvFile': true,
+      },
+    );
+    final repository = RealDokployRepository(api);
+    const service = ServiceModel(
+      id: 'application-1',
+      name: 'app',
+      kind: ServiceKind.application,
+      status: HealthState.healthy,
+    );
+
+    final environment = await repository.environment(service);
+    await repository.saveEnvironment(
+      service,
+      environment.copyWith(env: 'TOKEN=new'),
+    );
+
+    expect(api.savedEnvironmentResource, 'application');
+    expect(api.savedEnvironmentPayload, {
+      'applicationId': 'application-1',
+      'env': 'TOKEN=new',
+      'buildArgs': 'FLAVOR=production',
+      'buildSecrets': 'NPM_TOKEN=secret',
+      'createEnvFile': true,
+    });
+  });
+
+  test('restart waits for stop before starting the service', () async {
+    final api = _FakeApi(
+      permissionPayload: const {
+        'deployment': {'create': true},
+      },
+    );
+    final repository = RealDokployRepository(api);
+    const service = ServiceModel(
+      id: 'application-1',
+      name: 'app',
+      kind: ServiceKind.application,
+      status: HealthState.healthy,
+    );
+
+    await repository.restart(service);
+
+    expect(api.lifecycleCalls, ['stop', 'start']);
+  });
+
   test('enriches server inventory with the latest monitoring sample', () async {
     final repository = RealDokployRepository(
       _FakeApi(
@@ -346,6 +399,9 @@ class _FakeApi extends DokployApi {
   int deploymentCalls = 0;
   int serverCalls = 0;
   Map<String, dynamic>? controlPlaneMonitoringConfig;
+  String? savedEnvironmentResource;
+  Map<String, dynamic>? savedEnvironmentPayload;
+  final List<String> lifecycleCalls = [];
   String? prunedServerId;
 
   @override
@@ -365,6 +421,33 @@ class _FakeApi extends DokployApi {
 
   @override
   Future<dynamic> application(String id) async => applicationPayload;
+
+  @override
+  Future<dynamic> serviceConfiguration(
+    String resource,
+    String idKey,
+    String id,
+  ) async =>
+      applicationPayload;
+
+  @override
+  Future<void> saveServiceEnvironment(
+    String resource,
+    Map<String, dynamic> payload,
+  ) async {
+    savedEnvironmentResource = resource;
+    savedEnvironmentPayload = payload;
+  }
+
+  @override
+  Future<void> stopApplication(String id) async {
+    lifecycleCalls.add('stop');
+  }
+
+  @override
+  Future<void> startApplication(String id) async {
+    lifecycleCalls.add('start');
+  }
 
   @override
   Future<dynamic> applicationMonitoring(String appName) async =>

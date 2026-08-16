@@ -18,7 +18,13 @@ abstract interface class DokployRepository {
   Future<List<String>> deploymentLogs(String deploymentId, {int tail = 500});
   Future<void> start(ServiceModel service);
   Future<void> stop(ServiceModel service);
+  Future<void> restart(ServiceModel service);
   Future<void> redeploy(ServiceModel service);
+  Future<ServiceEnvironment> environment(ServiceModel service);
+  Future<void> saveEnvironment(
+    ServiceModel service,
+    ServiceEnvironment environment,
+  );
   Future<void> cancelDeployment(String deploymentId);
   Future<void> setupMonitoring({String? serverId});
   Future<void> pruneDocker({String? serverId});

@@ -170,6 +170,21 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
             ListTile(
               enabled: lifecycleAvailable,
               leading: const Icon(Icons.restart_alt),
+              title: const Text('Restart'),
+              subtitle: const Text('Stop, then start immediately'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _runAction(
+                  context,
+                  'Restart',
+                  service,
+                  () => ref.read(repositoryProvider).restart(service),
+                );
+              },
+            ),
+            ListTile(
+              enabled: lifecycleAvailable,
+              leading: const Icon(Icons.rocket_launch_outlined),
               title: const Text('Redeploy'),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -430,6 +445,7 @@ class _Logs extends ConsumerStatefulWidget {
 class _LogsState extends ConsumerState<_Logs> {
   int tail = 200;
   String search = '';
+  _LogStatus status = _LogStatus.all;
   Future<List<String>>? request;
 
   Future<List<String>> _load() =>
@@ -484,6 +500,25 @@ class _LogsState extends ConsumerState<_Logs> {
             ],
           ),
         ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: Row(
+            children: [
+              for (final value in _LogStatus.values) ...[
+                FilterChip(
+                  selected: status == value,
+                  label: Text(value.label),
+                  avatar: value == _LogStatus.all
+                      ? null
+                      : Icon(Icons.circle, size: 9, color: value.color),
+                  onSelected: (_) => setState(() => status = value),
+                ),
+                const SizedBox(width: 7),
+              ],
+            ],
+          ),
+        ),
         Expanded(
           child: FutureBuilder<List<String>>(
             future: request,
@@ -498,6 +533,8 @@ class _LogsState extends ConsumerState<_Logs> {
               final lines = (snapshot.data ?? const <String>[])
                   .where((line) =>
                       search.isEmpty || line.toLowerCase().contains(search))
+                  .where((line) =>
+                      status == _LogStatus.all || _logStatus(line) == status)
                   .toList();
               return Container(
                 color: const Color(0xFF070708),
@@ -538,13 +575,49 @@ class _LogsState extends ConsumerState<_Logs> {
   }
 
   Color _logColor(String line) {
-    final normalized = line.toLowerCase();
-    if (normalized.contains('error') || normalized.contains('fatal')) {
-      return const Color(0xFFFCA5A5);
-    }
-    if (normalized.contains('warn')) return const Color(0xFFFCD34D);
-    return const Color(0xFFD6D6DA);
+    return _logStatus(line).color;
   }
+}
+
+enum _LogStatus {
+  all('All', Color(0xFFD6D6DA)),
+  info('Info / success', Color(0xFFD6D6DA)),
+  warning('Warning / 4xx', DokployTheme.warning),
+  error('Error / 5xx', DokployTheme.danger);
+
+  const _LogStatus(this.label, this.color);
+  final String label;
+  final Color color;
+}
+
+_LogStatus _logStatus(String line) {
+  final normalized = line.toLowerCase();
+  if (normalized.contains('error') ||
+      normalized.contains('fatal') ||
+      normalized.contains('panic') ||
+      _containsHttpStatus(line, 5)) {
+    return _LogStatus.error;
+  }
+  if (normalized.contains('warn') || _containsHttpStatus(line, 4)) {
+    return _LogStatus.warning;
+  }
+  return _LogStatus.info;
+}
+
+bool _containsHttpStatus(String line, int statusClass) {
+  var digits = '';
+  for (final codeUnit in line.codeUnits) {
+    final isDigit = codeUnit >= 48 && codeUnit <= 57;
+    if (isDigit) {
+      digits += String.fromCharCode(codeUnit);
+    } else {
+      if (digits.length == 3 && int.parse(digits) ~/ 100 == statusClass) {
+        return true;
+      }
+      digits = '';
+    }
+  }
+  return digits.length == 3 && int.parse(digits) ~/ 100 == statusClass;
 }
 
 class _Deploys extends ConsumerWidget {
@@ -580,29 +653,190 @@ class _Deploys extends ConsumerWidget {
   }
 }
 
-class _Config extends StatelessWidget {
+class _Config extends ConsumerStatefulWidget {
   const _Config(this.service);
 
   final ServiceModel service;
 
   @override
+  ConsumerState<_Config> createState() => _ConfigState();
+}
+
+class _ConfigState extends ConsumerState<_Config> {
+  final _controller = TextEditingController();
+  ServiceEnvironment? _environment;
+  Object? _error;
+  bool _loading = false;
+  bool _saving = false;
+  bool _revealed = false;
+
+  @override
+  void didUpdateWidget(covariant _Config oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.service.id != widget.service.id) _hide();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _hide() {
+    _controller.clear();
+    _environment = null;
+    _error = null;
+    _revealed = false;
+  }
+
+  Future<void> _reveal() async {
+    final authorized = await confirmSensitiveOperation(
+      context,
+      ref,
+      reason: 'Reveal environment secrets for ${widget.service.name}.',
+    );
+    if (!authorized || !mounted) return;
+    setState(() {
+      _revealed = true;
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final value =
+          await ref.read(repositoryProvider).environment(widget.service);
+      if (!mounted) return;
+      _controller.text = value.env;
+      setState(() => _environment = value);
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    final current = _environment;
+    if (current == null) return;
+    final authorized = await confirmSensitiveOperation(
+      context,
+      ref,
+      reason: 'Save environment secrets for ${widget.service.name}.',
+    );
+    if (!authorized || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      final updated = current.copyWith(env: _controller.text);
+      await ref
+          .read(repositoryProvider)
+          .saveEnvironment(widget.service, updated);
+      if (!mounted) return;
+      setState(() => _environment = updated);
+      DployGoNotice.show(
+        context,
+        message: 'Environment saved. Restart or redeploy to apply it.',
+        tone: DployGoNoticeTone.success,
+      );
+    } catch (error) {
+      if (mounted) {
+        DployGoNotice.show(
+          context,
+          message: 'Could not save environment: $error',
+          tone: DployGoNoticeTone.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          Text(
+        children: [
+          const Text(
             'Configuration',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
-          SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: Icon(Icons.info_outline),
-              title: Text('Read-only in v0.1'),
-              subtitle: Text(
-                'Configuration editing stays hidden until its API contract and secret handling are validated.',
+          const SizedBox(height: 12),
+          if (!_revealed)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: const Text('Environment variables'),
+                subtitle: const Text(
+                  'Values are protected by biometric confirmation and never written to app logs.',
+                ),
+                trailing: FilledButton.tonalIcon(
+                  onPressed: _reveal,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Reveal'),
+                ),
               ),
+            )
+          else ...[
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Environment variables',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(_hide),
+                  icon: const Icon(Icons.visibility_off_outlined),
+                  label: const Text('Hide'),
+                ),
+              ],
             ),
-          ),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_error != null)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.error_outline),
+                  title: const Text('Could not load environment'),
+                  subtitle: Text('$_error'),
+                  trailing: IconButton(
+                    onPressed: _reveal,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ),
+              )
+            else ...[
+              TextField(
+                controller: _controller,
+                minLines: 9,
+                maxLines: 16,
+                autocorrect: false,
+                enableSuggestions: false,
+                keyboardType: TextInputType.multiline,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: const InputDecoration(
+                  alignLabelWithHint: true,
+                  labelText: '.env',
+                  hintText: 'KEY=value',
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Saving does not restart the service. Apply changes with Restart or Redeploy.',
+                style: TextStyle(color: DokployTheme.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(_saving ? 'Saving…' : 'Save environment'),
+              ),
+            ],
+          ],
         ],
       );
 }

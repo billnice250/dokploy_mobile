@@ -8,8 +8,8 @@ Color statusColor(HealthState s) => switch (s) {
       HealthState.healthy => DokployTheme.success,
       HealthState.warning => DokployTheme.warning,
       HealthState.failed => DokployTheme.danger,
-      HealthState.stopped => DokployTheme.muted,
-      HealthState.deploying => DokployTheme.info,
+      HealthState.stopped => DokployTheme.danger,
+      HealthState.deploying => DokployTheme.warning,
       _ => DokployTheme.muted
     };
 String statusLabel(HealthState s) =>

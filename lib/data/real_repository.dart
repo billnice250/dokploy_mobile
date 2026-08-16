@@ -723,6 +723,16 @@ class RealDokployRepository implements DokployRepository {
         ServiceKind.redis => 'redisId',
       };
 
+  String _resourceName(ServiceKind kind) => switch (kind) {
+        ServiceKind.application => 'application',
+        ServiceKind.compose => 'compose',
+        ServiceKind.postgres => 'postgres',
+        ServiceKind.mysql => 'mysql',
+        ServiceKind.mariadb => 'mariadb',
+        ServiceKind.mongo => 'mongo',
+        ServiceKind.redis => 'redis',
+      };
+
   String _deploymentService(Map deployment) {
     for (final key in ['application', 'compose']) {
       final service = deployment[key];
@@ -838,6 +848,12 @@ class RealDokployRepository implements DokployRepository {
   }
 
   @override
+  Future<void> restart(ServiceModel s) async {
+    await stop(s);
+    await start(s);
+  }
+
+  @override
   Future<void> redeploy(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('redeploy');
     return s.kind == ServiceKind.compose
@@ -845,6 +861,46 @@ class RealDokployRepository implements DokployRepository {
         : s.kind == ServiceKind.postgres
             ? api.deployPostgres(s.id)
             : api.redeployApplication(s.id);
+  }
+
+  @override
+  Future<ServiceEnvironment> environment(ServiceModel service) async {
+    final resource = _resourceName(service.kind);
+    final raw = await api.serviceConfiguration(
+      resource,
+      _idKey(service.kind),
+      service.id,
+    );
+    if (raw is! Map) return const ServiceEnvironment();
+    return ServiceEnvironment(
+      env: _s(raw, ['env']),
+      buildArgs: raw['buildArgs'] == null ? null : '${raw['buildArgs']}',
+      buildSecrets:
+          raw['buildSecrets'] == null ? null : '${raw['buildSecrets']}',
+      createEnvFile: raw['createEnvFile'] == true,
+    );
+  }
+
+  @override
+  Future<void> saveEnvironment(
+    ServiceModel service,
+    ServiceEnvironment environment,
+  ) {
+    final idKey = _idKey(service.kind);
+    final payload = <String, dynamic>{
+      idKey: service.id,
+      'env': environment.env,
+    };
+    if (service.kind == ServiceKind.application) {
+      payload.addAll({
+        'buildArgs': environment.buildArgs,
+        'buildSecrets': environment.buildSecrets,
+        'createEnvFile': environment.createEnvFile,
+      });
+    } else if (service.kind == ServiceKind.compose) {
+      payload['createEnvFile'] = environment.createEnvFile;
+    }
+    return api.saveServiceEnvironment(_resourceName(service.kind), payload);
   }
 
   @override
