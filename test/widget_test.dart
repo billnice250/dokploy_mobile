@@ -234,10 +234,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      tester
+          .widget<AnimatedAlign>(
+              find.byKey(const ValueKey('liquid-nav-indicator')))
+          .alignment,
+      Alignment.centerRight,
+    );
+
     await tester.tap(find.text('Home').last);
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(router.routeInformationProvider.value.uri.path, '/');
+    expect(
+      tester
+          .widget<AnimatedAlign>(
+              find.byKey(const ValueKey('liquid-nav-indicator')))
+          .alignment,
+      Alignment.centerLeft,
+    );
     expect(
       tester
           .widget<AnimatedOpacity>(
