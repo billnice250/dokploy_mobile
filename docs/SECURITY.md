@@ -2,9 +2,15 @@
 
 ## Current guarantees
 
-- A saved API key is written only through `flutter_secure_storage` (Keychain on iOS and encrypted platform storage backed by Android security facilities).
-- Preferences contain profile identifiers, display names, base URLs, and discovered version metadata only.
-- Real instance enrollment requires HTTPS. The transport does not install a permissive certificate callback.
+- Saved API keys, normalized custom CA chains, PKCS#12 client identities, and
+  their passwords are written only through `flutter_secure_storage` (Keychain
+  on iOS and encrypted platform storage backed by Android security facilities).
+- Preferences contain profile identifiers, display names, base URLs, selected
+  authentication mode, credential-presence flags, original filenames, and
+  discovered version metadata only.
+- Real instance enrollment requires HTTPS. Custom trust anchors are scoped to
+  one instance and extend the system roots; hostname verification remains
+  enabled and the transport does not install a permissive certificate callback.
 - API keys are never added to error text, domain objects, or UI state.
 - Debug HTTP tracing redacts credentials and sensitive response fields. API
   keys are represented only by their trimmed length and a 12-character SHA-256
@@ -19,7 +25,9 @@ Use a dedicated, least-privilege Dokploy token. Dokploy permissions can limit AP
 
 ## Not implemented yet
 
-Biometric gates, app lock, production-instance policy, screenshot protection, clipboard expiry, terminal sessions, and secret reveal flows remain unavailable. UI placeholders must not be interpreted as security controls.
+App lock, production-instance policy, screenshot protection, clipboard expiry,
+terminal sessions, and secret reveal flows remain unavailable. UI placeholders
+must not be interpreted as security controls.
 
 ## Reporting
 

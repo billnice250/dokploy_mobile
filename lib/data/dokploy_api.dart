@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 
 import '../domain/failures.dart';
+import '../domain/models.dart';
+import 'tls_credentials.dart';
 
 /// Thin RPC-style Dokploy transport. Endpoint names and transport failures stay
 /// here so they cannot leak into widgets or app-owned domain models.
@@ -14,10 +17,14 @@ class DokployApi {
   DokployApi({
     required String baseUrl,
     required String apiKey,
+    SecurityContext? securityContext,
+    bool sendApiKey = true,
     HttpClientAdapter? adapter,
   })  : monitoringCallbackUrl = _monitoringCallbackUrl(baseUrl),
         _baseUri = Uri.parse(baseUrl.trim()),
         _apiKey = apiKey.trim(),
+        _sendApiKey = sendApiKey,
+        _securityContext = securityContext,
         _dio = Dio(
           BaseOptions(
             baseUrl: _apiBaseUrl(baseUrl),
@@ -25,21 +32,47 @@ class DokployApi {
             sendTimeout: const Duration(seconds: 15),
             receiveTimeout: const Duration(seconds: 30),
             headers: {
-              'x-api-key': apiKey.trim(),
+              if (sendApiKey && apiKey.trim().isNotEmpty)
+                'x-api-key': apiKey.trim(),
               'Accept': 'application/json',
               'Content-Type': 'application/json',
             },
           ),
         ) {
-    if (adapter != null) _dio.httpClientAdapter = adapter;
+    if (adapter != null) {
+      _dio.httpClientAdapter = adapter;
+    } else if (securityContext != null) {
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () => HttpClient(context: securityContext),
+      );
+    }
     if (kDebugMode) {
       _dio.interceptors.add(_SafeHttpLogger(apiKey.trim()));
     }
   }
 
+  factory DokployApi.forInstance({
+    required DokployInstance instance,
+    required InstanceSecrets secrets,
+    HttpClientAdapter? adapter,
+  }) {
+    final usesClientCertificate = instance.authMode != InstanceAuthMode.apiKey;
+    final needsSecurityContext = instance.hasCustomCa || usesClientCertificate;
+    return DokployApi(
+      baseUrl: instance.baseUrl,
+      apiKey: secrets.apiKey,
+      sendApiKey: instance.authMode != InstanceAuthMode.clientCertificate,
+      securityContext:
+          needsSecurityContext ? buildSecurityContext(instance, secrets) : null,
+      adapter: adapter,
+    );
+  }
+
   final Dio _dio;
   final Uri _baseUri;
   final String _apiKey;
+  final bool _sendApiKey;
+  final SecurityContext? _securityContext;
 
   /// Public callback consumed by Dokploy's monitoring sidecar for threshold
   /// events. This must be an absolute URL even when thresholds are disabled.
@@ -240,7 +273,8 @@ class DokployApi {
     );
     final channel = IOWebSocketChannel.connect(
       uri,
-      headers: {'x-api-key': _apiKey},
+      headers: _authenticationHeaders,
+      customClient: _webSocketClient(),
       pingInterval: const Duration(seconds: 20),
       connectTimeout: const Duration(seconds: 10),
     );
@@ -283,7 +317,8 @@ class DokployApi {
     );
     final channel = IOWebSocketChannel.connect(
       uri,
-      headers: {'x-api-key': _apiKey},
+      headers: _authenticationHeaders,
+      customClient: _webSocketClient(),
       pingInterval: const Duration(seconds: 20),
       connectTimeout: const Duration(seconds: 10),
     );
@@ -313,6 +348,13 @@ class DokployApi {
       post('postgres.stop', {'postgresId': id});
   Future<void> deployPostgres(String id) async =>
       post('postgres.deploy', {'postgresId': id});
+
+  Map<String, String> get _authenticationHeaders => {
+        if (_sendApiKey && _apiKey.isNotEmpty) 'x-api-key': _apiKey,
+      };
+
+  HttpClient? _webSocketClient() =>
+      _securityContext == null ? null : HttpClient(context: _securityContext);
 }
 
 String _apiBaseUrl(String input) {

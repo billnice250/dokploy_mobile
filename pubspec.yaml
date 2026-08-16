@@ -21,6 +21,8 @@ dependencies:
   local_auth: ^2.3.0
   web_socket_channel: ^3.0.1
   flutter_local_notifications: ^21.0.0
+  file_picker: ^11.0.3
+  pkcs7: ^1.0.6
 
 dev_dependencies:
   flutter_test:
@@ -31,6 +33,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  config:
+    # flutter_secure_storage still requires CocoaPods on iOS. Keep one native
+    # dependency manager until every production plugin supports SwiftPM.
+    enable-swift-package-manager: false
   assets:
     - assets/branding/dokploy-mark.png
 

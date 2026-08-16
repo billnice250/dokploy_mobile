@@ -2,7 +2,9 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:dokploy_mobile/data/dokploy_api.dart';
+import 'package:dokploy_mobile/data/tls_credentials.dart';
 import 'package:dokploy_mobile/domain/failures.dart';
+import 'package:dokploy_mobile/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -37,6 +39,24 @@ void main() {
       adapter.request?.uri.toString(),
       'https://dokploy.example.com/api/project.all',
     );
+  });
+
+  test('client-certificate-only mode does not send an API key', () async {
+    final adapter = _RecordingAdapter();
+    final api = DokployApi.forInstance(
+      instance: const DokployInstance(
+        id: 'mtls',
+        name: 'mTLS proxy',
+        baseUrl: 'https://dokploy.example.com',
+        authMode: InstanceAuthMode.clientCertificate,
+      ),
+      secrets: const InstanceSecrets(apiKey: 'must-not-be-sent'),
+      adapter: adapter,
+    );
+
+    await api.projects();
+
+    expect(adapter.request?.headers, isNot(contains('x-api-key')));
   });
 
   test('uses the protected tRPC envelope for Traefik request logs', () async {

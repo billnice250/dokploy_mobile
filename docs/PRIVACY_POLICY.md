@@ -17,7 +17,8 @@ is not affiliated with or endorsed by Dokploy.
 - We do not operate an intermediary server for the app's core functionality.
 - Operational requests are sent directly from your device to the Dokploy
   instance you configure.
-- API keys are stored on your device using iOS Keychain or Android secure
+- API keys, custom CA chains, client-certificate files, and certificate
+  passwords are stored on your device using iOS Keychain or Android secure
   storage.
 - We do not include advertising or third-party analytics SDKs.
 - We do not sell personal information or use it for cross-context behavioral
@@ -31,13 +32,17 @@ When you add an instance, you provide:
 
 - an instance display name;
 - the instance's HTTPS URL; and
-- a Dokploy API key.
+- a Dokploy API key, unless you select client-certificate-only authentication;
+- optional custom CA certificates; and
+- an optional PKCS#12 client certificate and password.
 
 The display name, URL, selected instance identifier, and discovered version
-metadata are stored in the app's local preferences. The API key is stored
-separately using platform secure storage. DployGo sends the API key directly to
-your configured Dokploy instance to authenticate requests. We do not receive or
-store the key on developer-operated servers.
+metadata, authentication mode, and credential filenames are stored in the
+app's local preferences. API keys, CA certificate contents, client identities,
+and certificate passwords are stored separately using platform secure storage.
+DployGo sends the selected credentials directly to your configured Dokploy
+instance to establish and authenticate connections. We do not receive or store
+them on developer-operated servers.
 
 ### Dokploy operational data
 
@@ -129,8 +134,8 @@ cross-context behavioral advertising.
 Most information described in this policy is stored only on your device or on
 the Dokploy instance you selected.
 
-- Removing an instance in DployGo deletes its saved profile and API key from the
-  device.
+- Removing an instance in DployGo deletes its saved profile, API key, custom CA
+  chain, client identity, and certificate password from the device.
 - Notification history is limited to the 100 most recent events. In the current
   version, notification history, preferences, and deployment snapshots may
   remain after an instance is removed.
@@ -148,9 +153,10 @@ been compromised.
 
 ## Security
 
-DployGo requires HTTPS when adding a real Dokploy instance, stores API keys using
-platform secure storage, and does not deliberately place API keys in normal app
-logs or error messages. You should use a dedicated, least-privilege Dokploy API
+DployGo requires HTTPS when adding a real Dokploy instance, stores authentication
+credentials using platform secure storage, and does not deliberately place
+credentials in normal app logs or error messages. Custom CAs do not disable
+hostname verification. You should use a dedicated, least-privilege Dokploy API
 key and keep your device, operating system, and Dokploy server secure.
 
 No storage or transmission method is completely secure. The security of data on
@@ -222,4 +228,3 @@ apply prospectively unless otherwise permitted by law.
 
 **Bill Nice**
 **Email:** beta_pearls6g@icloud.com
-

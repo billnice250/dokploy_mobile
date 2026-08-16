@@ -60,18 +60,59 @@ class ContainerInstance {
   bool get running => state.toLowerCase() == 'running';
 }
 
+enum InstanceAuthMode {
+  apiKey,
+  apiKeyAndClientCertificate,
+  clientCertificate,
+}
+
 class DokployInstance {
-  const DokployInstance(
-      {required this.id,
-      required this.name,
-      required this.baseUrl,
-      this.version = 'unknown',
-      this.demo = false});
+  const DokployInstance({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    this.version = 'unknown',
+    this.demo = false,
+    this.authMode = InstanceAuthMode.apiKey,
+    this.hasCustomCa = false,
+    this.hasClientCertificate = false,
+    this.caFileName = '',
+    this.clientCertificateFileName = '',
+  });
   final String id;
   final String name;
   final String baseUrl;
   final String version;
   final bool demo;
+  final InstanceAuthMode authMode;
+  final bool hasCustomCa;
+  final bool hasClientCertificate;
+  final String caFileName;
+  final String clientCertificateFileName;
+
+  DokployInstance copyWith({
+    String? name,
+    String? baseUrl,
+    String? version,
+    InstanceAuthMode? authMode,
+    bool? hasCustomCa,
+    bool? hasClientCertificate,
+    String? caFileName,
+    String? clientCertificateFileName,
+  }) =>
+      DokployInstance(
+        id: id,
+        name: name ?? this.name,
+        baseUrl: baseUrl ?? this.baseUrl,
+        version: version ?? this.version,
+        demo: demo,
+        authMode: authMode ?? this.authMode,
+        hasCustomCa: hasCustomCa ?? this.hasCustomCa,
+        hasClientCertificate: hasClientCertificate ?? this.hasClientCertificate,
+        caFileName: caFileName ?? this.caFileName,
+        clientCertificateFileName:
+            clientCertificateFileName ?? this.clientCertificateFileName,
+      );
 }
 
 class CapabilitySet {

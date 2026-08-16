@@ -6,8 +6,8 @@ An **unofficial Flutter mobile console for Dokploy**, designed for operations fr
 
 ## What is included
 
-- Multi-instance architecture (URL + API key)
-- API key storage using iOS Keychain / Android Keystore (`flutter_secure_storage`)
+- Multi-instance architecture with API key and mutual-TLS authentication
+- Secure API key, custom CA, and PKCS#12 client-identity storage
 - Dokploy-like dark UI and mobile command center
 - Projects and service browsing
 - Application / Compose / database service model
@@ -85,14 +85,16 @@ The app launches in **Demo Infrastructure** mode, so you can inspect the UI with
 
 1. In Dokploy, create an API token that has only the permissions you want the phone to have.
 2. Open **Settings → Add Dokploy instance**.
-3. Enter the HTTPS URL and token.
+3. Enter the HTTPS URL and token. If required, add one or more PEM/P7B CA
+   chains and a password-protected `.p12`/`.pfx` client identity.
 4. Tap **Test & save**. The app probes `project.all`, stores the key securely, and switches to the real repository.
 
 Saved profiles can be switched or removed in Settings, and the last active real instance is restored at startup.
 
 ## Security model
 
-- Never put API keys in SharedPreferences, logs, analytics or crash reports.
+- Never put API keys, CA chains, client identities, or certificate passwords in
+  SharedPreferences, logs, analytics, or crash reports.
 - Keep secrets in Keychain/Keystore only.
 - Require valid HTTPS by default.
 - Prefer a dedicated least-privilege Dokploy API token for mobile use.

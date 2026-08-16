@@ -8,6 +8,7 @@ import 'data/dokploy_api.dart';
 import 'data/instance_store.dart';
 import 'data/real_repository.dart';
 import 'data/repository.dart';
+import 'data/tls_credentials.dart';
 import 'domain/models.dart';
 
 Future<void> main() async {
@@ -36,12 +37,12 @@ Future<({DokployInstance instance, DokployRepository repository})?>
     if (activeId == null) return null;
     final active = instances.where((item) => item.id == activeId).firstOrNull;
     if (active == null) return null;
-    final apiKey = await store.apiKey(active.id);
-    if (apiKey == null || apiKey.isEmpty) return null;
+    final secrets = await store.secrets(active.id);
+    if (!_hasRequiredCredentials(active, secrets)) return null;
     return (
       instance: active,
       repository: RealDokployRepository(
-        DokployApi(baseUrl: active.baseUrl, apiKey: apiKey),
+        DokployApi.forInstance(instance: active, secrets: secrets),
       ),
     );
   } catch (_) {
@@ -49,6 +50,16 @@ Future<({DokployInstance instance, DokployRepository repository})?>
     // safe startup fallback and the user can retry from instance settings.
     return null;
   }
+}
+
+bool _hasRequiredCredentials(
+  DokployInstance instance,
+  InstanceSecrets secrets,
+) {
+  final needsApiKey = instance.authMode != InstanceAuthMode.clientCertificate;
+  final needsClientCertificate = instance.authMode != InstanceAuthMode.apiKey;
+  return (!needsApiKey || secrets.apiKey.isNotEmpty) &&
+      (!needsClientCertificate || secrets.hasClientCertificate);
 }
 
 extension _FirstOrNull<T> on Iterable<T> {
