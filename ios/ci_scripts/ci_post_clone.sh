@@ -59,7 +59,19 @@ flutter pub get
 # - Google Fonts missing
 # - missing flutter_assets
 # - Xcode archive fails
-flutter build ios --release --no-codesign
+#
+# Flutter writes FLUTTER_BUILD_NUMBER into Generated.xcconfig. Use Xcode
+# Cloud's monotonically increasing build number instead of reusing the static
+# `+1` from pubspec.yaml, which App Store Connect rejects after the first
+# upload of a marketing version.
+if [ -n "${CI_BUILD_NUMBER:-}" ]; then
+  echo "Using Xcode Cloud build number: $CI_BUILD_NUMBER"
+  flutter build ios --release --no-codesign \
+    --build-number="$CI_BUILD_NUMBER"
+else
+  echo "CI_BUILD_NUMBER is unavailable; using the pubspec build number."
+  flutter build ios --release --no-codesign
+fi
 
 echo "Flutter iOS build artifacts generated."
 
