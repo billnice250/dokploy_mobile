@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/instance_store.dart';
+import '../data/dokploy_api.dart';
 import '../data/mock_repository.dart';
 import '../data/notification_store.dart';
 import '../data/repository.dart';
@@ -17,6 +18,10 @@ const demoInstance = DokployInstance(
 
 final instanceStoreProvider =
     Provider<InstanceStore>((ref) => const InstanceStore());
+final instanceConnectionProbeProvider =
+    Provider<Future<void> Function(DokployApi api)>(
+  (ref) => (api) async => api.projects(),
+);
 final instancesProvider = FutureProvider<List<DokployInstance>>(
   (ref) => ref.watch(instanceStoreProvider).load(),
 );

@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:dokploy_mobile/app.dart';
 import 'package:dokploy_mobile/core/providers.dart';
 import 'package:dokploy_mobile/core/router.dart';
 import 'package:dokploy_mobile/core/biometric_confirmation.dart';
 import 'package:dokploy_mobile/data/mock_repository.dart';
+import 'package:dokploy_mobile/data/instance_store.dart';
+import 'package:dokploy_mobile/data/tls_credentials.dart';
 import 'package:dokploy_mobile/domain/models.dart';
 import 'package:dokploy_mobile/screens/service_detail.dart';
 import 'package:dokploy_mobile/screens/settings.dart';
@@ -92,6 +96,82 @@ void main() {
     await tester.tap(find.byTooltip('Cancel adding instance'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Cancel adding instance'), findsNothing);
+  });
+
+  testWidgets('instance change during connection-sheet dismissal is safe',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(() => router.go('/'));
+    router.go('/settings');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          instancesProvider.overrideWith((ref) async => const []),
+        ],
+        child: const DokployMobileApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Dokploy instance'));
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    );
+    await tester.tap(find.byTooltip('Cancel adding instance'));
+    container.read(currentInstanceProvider.notifier).state =
+        const DokployInstance(
+      id: 'saved-instance',
+      name: 'Saved instance',
+      baseUrl: 'https://dokploy.example.com',
+    );
+    container.read(repositoryProvider.notifier).state = MockDokployRepository();
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Cancel adding instance'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('test and save closes safely before activating the instance',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(() => router.go('/'));
+    router.go('/settings');
+    final store = _MemoryInstanceStore();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          instanceStoreProvider.overrideWithValue(store),
+          instanceConnectionProbeProvider.overrideWithValue((_) async {}),
+        ],
+        child: const DokployMobileApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Dokploy instance'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'HTTPS URL'),
+      'https://dokploy.example.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'API key'),
+      'test-api-key',
+    );
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'Test & save'),
+      350,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Test & save'));
+    await tester.pumpAndSettle();
+
+    expect(store.saved?.baseUrl, 'https://dokploy.example.com');
+    expect(find.byTooltip('Cancel adding instance'), findsNothing);
+    expect(find.text('Connection settings updated.'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('unavailable server metrics fit on a compact phone',
@@ -374,6 +454,36 @@ class _FakeAuthorizer implements SensitiveOperationAuthorizer {
   @override
   Future<BiometricConfirmationResult> confirm({required String reason}) async =>
       result;
+}
+
+class _MemoryInstanceStore extends InstanceStore {
+  DokployInstance? saved;
+  InstanceSecrets secretsValue = const InstanceSecrets();
+
+  @override
+  Future<List<DokployInstance>> load() async => [if (saved != null) saved!];
+
+  @override
+  Future<void> save(
+    DokployInstance instance,
+    String apiKey, {
+    String caPemBundle = '',
+    List<int>? clientPkcs12,
+    String clientPkcs12Password = '',
+    bool setActiveInstance = true,
+  }) async {
+    saved = instance;
+    secretsValue = InstanceSecrets(
+      apiKey: apiKey,
+      caPemBundle: caPemBundle,
+      clientPkcs12:
+          clientPkcs12 == null ? null : Uint8List.fromList(clientPkcs12),
+      clientPkcs12Password: clientPkcs12Password,
+    );
+  }
+
+  @override
+  Future<InstanceSecrets> secrets(String id) async => secretsValue;
 }
 
 class _SensitiveRepository extends _MetricRepository {

@@ -60,31 +60,52 @@ class _DokployMobileAppState extends ConsumerState<DokployMobileApp> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => MaterialApp.router(
+        title: 'DployGo',
+        debugShowCheckedModeBanner: false,
+        theme: DokployTheme.light,
+        darkTheme: DokployTheme.dark,
+        themeMode: ThemeMode.dark,
+        routerConfig: router,
+        builder: (context, child) => _RuntimeCoordinator(
+          notificationCoordinator: _coordinator,
+          liveDataCoordinator: _liveData,
+          child: child ?? const SizedBox.shrink(),
+        ),
+      );
+}
+
+/// Keeps runtime services reactive without rebuilding [MaterialApp.router].
+/// Rebuilding the root router while a modal route is dismissing can deactivate
+/// inherited widgets before the modal has released its dependencies.
+class _RuntimeCoordinator extends ConsumerWidget {
+  const _RuntimeCoordinator({
+    required this.notificationCoordinator,
+    required this.liveDataCoordinator,
+    required this.child,
+  });
+
+  final NotificationCoordinator notificationCoordinator;
+  final LiveDataCoordinator liveDataCoordinator;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final instance = ref.watch(currentInstanceProvider);
     final repository = ref.watch(repositoryProvider);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _liveData.configure(enabled: !instance.demo);
-    });
     final preferences =
         ref.watch(notificationPreferencesProvider(instance.id)).valueOrNull;
-    if (preferences != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _coordinator.configure(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      liveDataCoordinator.configure(enabled: !instance.demo);
+      if (preferences != null) {
+        notificationCoordinator.configure(
           repository: repository,
           instance: instance,
           preferences: preferences,
         );
-      });
-    }
-    return MaterialApp.router(
-      title: 'DployGo',
-      debugShowCheckedModeBanner: false,
-      theme: DokployTheme.light,
-      darkTheme: DokployTheme.dark,
-      themeMode: ThemeMode.dark,
-      routerConfig: router,
-    );
+      }
+    });
+    return child;
   }
 }

@@ -389,384 +389,399 @@ class SettingsScreen extends ConsumerWidget {
     var clientCertificateFileName = existing?.clientCertificateFileName ?? '';
     var busy = false;
     String? error;
+    Future<dynamic>? sheetDismissed;
 
-    await showModalBottomSheet<void>(
+    final saved = await showModalBottomSheet<
+        ({DokployInstance instance, DokployApi api, bool activate})>(
       context: context,
       isScrollControlled: true,
       isDismissible: true,
       enableDrag: true,
       showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setLocalState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            8,
-            16,
-            MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        existing == null
-                            ? 'Add Dokploy instance'
-                            : 'Edit ${existing.name}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Cancel adding instance',
-                      onPressed:
-                          busy ? null : () => Navigator.pop(sheetContext),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'Name')),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: url,
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'HTTPS URL',
-                    hintText: 'https://dokploy.example.com',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<InstanceAuthMode>(
-                  initialValue: authMode,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Authentication mode',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: InstanceAuthMode.apiKey,
-                      child: Text('API key'),
-                    ),
-                    DropdownMenuItem(
-                      value: InstanceAuthMode.apiKeyAndClientCertificate,
-                      child: Text('API key + client certificate'),
-                    ),
-                    DropdownMenuItem(
-                      value: InstanceAuthMode.clientCertificate,
-                      child: Text('Client certificate only'),
-                    ),
-                  ],
-                  onChanged: busy
-                      ? null
-                      : (value) => setLocalState(
-                            () => authMode = value ?? authMode,
-                          ),
-                ),
-                if (authMode != InstanceAuthMode.clientCertificate) ...[
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: key,
-                    obscureText: true,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'API key'),
-                  ),
-                ],
-                if (authMode != InstanceAuthMode.clientCertificate) ...[
-                  const SizedBox(height: 10),
-                  const Card(
-                    child: ExpansionTile(
-                      leading: Icon(Icons.key_outlined),
-                      title: Text('How do I get an API key?'),
-                      subtitle: Text('Portal steps and security notes'),
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: _ApiKeyGuideContent(compact: true),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Card(
-                  child: Column(
+      builder: (sheetContext) {
+        sheetDismissed ??= ModalRoute.of(sheetContext)?.completed;
+        return StatefulBuilder(
+          builder: (sheetContext, setLocalState) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      ListTile(
-                        leading: const Icon(Icons.verified_user_outlined),
-                        title: const Text('Custom certificate authority'),
-                        subtitle: Text(
-                          caPemBundle.isEmpty
-                              ? 'Optional PEM certificate list or P7B chain'
-                              : caFileName.isEmpty
-                                  ? 'Custom trust chain loaded'
-                                  : caFileName,
-                        ),
-                        trailing: caPemBundle.isEmpty
-                            ? const Icon(Icons.upload_file_outlined)
-                            : IconButton(
-                                tooltip: 'Remove custom CA',
-                                onPressed: busy
-                                    ? null
-                                    : () => setLocalState(() {
-                                          caPemBundle = '';
-                                          caFileName = '';
-                                        }),
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                        onTap: busy
-                            ? null
-                            : () async {
-                                try {
-                                  final picked = await _pickFiles(
-                                    const ['pem', 'crt', 'cer', 'p7b', 'p7c'],
-                                    allowMultiple: true,
-                                  );
-                                  if (picked.isEmpty) return;
-                                  final normalized = picked
-                                      .map((file) =>
-                                          normalizeTrustBundle(file.bytes))
-                                      .join('\n');
-                                  setLocalState(() {
-                                    caPemBundle = normalized;
-                                    caFileName = picked
-                                        .map((file) => file.name)
-                                        .join(', ');
-                                    error = null;
-                                  });
-                                } catch (failure) {
-                                  setLocalState(() => error =
-                                      'Could not read CA chain: $failure');
-                                }
-                              },
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      Expanded(
                         child: Text(
-                          'System roots stay enabled. The custom certificates apply only to this instance; hostname verification is never disabled.',
-                          style: TextStyle(fontSize: 12, height: 1.35),
+                          existing == null
+                              ? 'Add Dokploy instance'
+                              : 'Edit ${existing.name}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
+                      ),
+                      IconButton(
+                        tooltip: 'Cancel adding instance',
+                        onPressed:
+                            busy ? null : () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
                       ),
                     ],
                   ),
-                ),
-                if (authMode != InstanceAuthMode.apiKey) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                      controller: name,
+                      decoration: const InputDecoration(labelText: 'Name')),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: url,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'HTTPS URL',
+                      hintText: 'https://dokploy.example.com',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<InstanceAuthMode>(
+                    initialValue: authMode,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Authentication mode',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: InstanceAuthMode.apiKey,
+                        child: Text('API key'),
+                      ),
+                      DropdownMenuItem(
+                        value: InstanceAuthMode.apiKeyAndClientCertificate,
+                        child: Text('API key + client certificate'),
+                      ),
+                      DropdownMenuItem(
+                        value: InstanceAuthMode.clientCertificate,
+                        child: Text('Client certificate only'),
+                      ),
+                    ],
+                    onChanged: busy
+                        ? null
+                        : (value) => setLocalState(
+                              () => authMode = value ?? authMode,
+                            ),
+                  ),
+                  if (authMode != InstanceAuthMode.clientCertificate) ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: key,
+                      obscureText: true,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      decoration: const InputDecoration(labelText: 'API key'),
+                    ),
+                  ],
+                  if (authMode != InstanceAuthMode.clientCertificate) ...[
+                    const SizedBox(height: 10),
+                    const Card(
+                      child: ExpansionTile(
+                        leading: Icon(Icons.key_outlined),
+                        title: Text('How do I get an API key?'),
+                        subtitle: Text('Portal steps and security notes'),
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: _ApiKeyGuideContent(compact: true),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Card(
                     child: Column(
                       children: [
                         ListTile(
-                          leading: const Icon(Icons.badge_outlined),
-                          title: const Text('Client identity'),
+                          leading: const Icon(Icons.verified_user_outlined),
+                          title: const Text('Custom certificate authority'),
                           subtitle: Text(
-                            clientPkcs12 == null
-                                ? 'Select a PKCS#12 .p12 or .pfx file'
-                                : clientCertificateFileName.isEmpty
-                                    ? 'Client certificate loaded'
-                                    : clientCertificateFileName,
+                            caPemBundle.isEmpty
+                                ? 'Optional PEM certificate list or P7B chain'
+                                : caFileName.isEmpty
+                                    ? 'Custom trust chain loaded'
+                                    : caFileName,
                           ),
-                          trailing: clientPkcs12 == null
+                          trailing: caPemBundle.isEmpty
                               ? const Icon(Icons.upload_file_outlined)
                               : IconButton(
-                                  tooltip: 'Remove client certificate',
+                                  tooltip: 'Remove custom CA',
                                   onPressed: busy
                                       ? null
                                       : () => setLocalState(() {
-                                            clientPkcs12 = null;
-                                            clientCertificateFileName = '';
-                                            certificatePassword.clear();
+                                            caPemBundle = '';
+                                            caFileName = '';
                                           }),
                                   icon: const Icon(Icons.close_rounded),
                                 ),
                           onTap: busy
                               ? null
                               : () async {
-                                  final files = await _pickFiles(
-                                    const ['p12', 'pfx'],
-                                  );
-                                  if (files.isEmpty) return;
-                                  final picked = files.first;
-                                  setLocalState(() {
-                                    clientPkcs12 = picked.bytes;
-                                    clientCertificateFileName = picked.name;
-                                    error = null;
-                                  });
+                                  try {
+                                    final picked = await _pickFiles(
+                                      const ['pem', 'crt', 'cer', 'p7b', 'p7c'],
+                                      allowMultiple: true,
+                                    );
+                                    if (picked.isEmpty) return;
+                                    final normalized = picked
+                                        .map((file) =>
+                                            normalizeTrustBundle(file.bytes))
+                                        .join('\n');
+                                    setLocalState(() {
+                                      caPemBundle = normalized;
+                                      caFileName = picked
+                                          .map((file) => file.name)
+                                          .join(', ');
+                                      error = null;
+                                    });
+                                  } catch (failure) {
+                                    setLocalState(() => error =
+                                        'Could not read CA chain: $failure');
+                                  }
                                 },
                         ),
-                        if (clientPkcs12 != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                            child: TextField(
-                              controller: certificatePassword,
-                              obscureText: true,
-                              enableSuggestions: false,
-                              autocorrect: false,
-                              decoration: const InputDecoration(
-                                labelText: 'Certificate password',
-                                hintText: 'Leave empty if unprotected',
-                              ),
-                            ),
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+                          child: Text(
+                            'System roots stay enabled. The custom certificates apply only to this instance; hostname verification is never disabled.',
+                            style: TextStyle(fontSize: 12, height: 1.35),
                           ),
+                        ),
                       ],
                     ),
                   ),
-                  if (authMode == InstanceAuthMode.clientCertificate)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(6, 8, 6, 0),
-                      child: Text(
-                        'Client-certificate-only authentication requires a reverse proxy that authorizes the certificate. Dokploy may still return 401 when its API-key authentication is enabled.',
-                        style: TextStyle(
-                          color: DokployTheme.warning,
-                          fontSize: 12,
-                          height: 1.35,
-                        ),
+                  if (authMode != InstanceAuthMode.apiKey) ...[
+                    const SizedBox(height: 10),
+                    Card(
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.badge_outlined),
+                            title: const Text('Client identity'),
+                            subtitle: Text(
+                              clientPkcs12 == null
+                                  ? 'Select a PKCS#12 .p12 or .pfx file'
+                                  : clientCertificateFileName.isEmpty
+                                      ? 'Client certificate loaded'
+                                      : clientCertificateFileName,
+                            ),
+                            trailing: clientPkcs12 == null
+                                ? const Icon(Icons.upload_file_outlined)
+                                : IconButton(
+                                    tooltip: 'Remove client certificate',
+                                    onPressed: busy
+                                        ? null
+                                        : () => setLocalState(() {
+                                              clientPkcs12 = null;
+                                              clientCertificateFileName = '';
+                                              certificatePassword.clear();
+                                            }),
+                                    icon: const Icon(Icons.close_rounded),
+                                  ),
+                            onTap: busy
+                                ? null
+                                : () async {
+                                    final files = await _pickFiles(
+                                      const ['p12', 'pfx'],
+                                    );
+                                    if (files.isEmpty) return;
+                                    final picked = files.first;
+                                    setLocalState(() {
+                                      clientPkcs12 = picked.bytes;
+                                      clientCertificateFileName = picked.name;
+                                      error = null;
+                                    });
+                                  },
+                          ),
+                          if (clientPkcs12 != null)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                              child: TextField(
+                                controller: certificatePassword,
+                                obscureText: true,
+                                enableSuggestions: false,
+                                autocorrect: false,
+                                decoration: const InputDecoration(
+                                  labelText: 'Certificate password',
+                                  hintText: 'Leave empty if unprotected',
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                ],
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(error!,
-                        style: const TextStyle(color: DokployTheme.danger)),
-                  ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: busy
-                      ? null
-                      : () async {
-                          var normalized = url.text.trim();
-                          while (normalized.endsWith('/')) {
-                            normalized = normalized.substring(
-                              0,
-                              normalized.length - 1,
-                            );
-                          }
-                          final uri = Uri.tryParse(normalized);
-                          final needsApiKey =
-                              authMode != InstanceAuthMode.clientCertificate;
-                          final needsClientCertificate =
-                              authMode != InstanceAuthMode.apiKey;
-                          if (uri == null ||
-                              uri.scheme != 'https' ||
-                              uri.host.isEmpty ||
-                              (needsApiKey && key.text.trim().isEmpty) ||
-                              (needsClientCertificate &&
-                                  clientPkcs12 == null)) {
-                            setLocalState(
-                              () => error =
-                                  'Enter a valid HTTPS URL and all required authentication data.',
-                            );
-                            return;
-                          }
-                          setLocalState(() {
-                            busy = true;
-                            error = null;
-                          });
-                          try {
-                            final instance = DokployInstance(
-                              id: existing?.id ??
-                                  DateTime.now()
-                                      .microsecondsSinceEpoch
-                                      .toString(),
-                              name: name.text.trim().isEmpty
-                                  ? uri.host
-                                  : name.text.trim(),
-                              baseUrl: normalized,
-                              version: existing?.version ?? 'unknown',
-                              authMode: authMode,
-                              hasCustomCa: caPemBundle.isNotEmpty,
-                              hasClientCertificate: clientPkcs12 != null,
-                              caFileName: caFileName,
-                              clientCertificateFileName:
-                                  clientCertificateFileName,
-                            );
-                            final secrets = InstanceSecrets(
-                              apiKey: key.text.trim(),
-                              caPemBundle: caPemBundle,
-                              clientPkcs12: clientPkcs12,
-                              clientPkcs12Password: certificatePassword.text,
-                            );
-                            final api = DokployApi.forInstance(
-                              instance: instance,
-                              secrets: secrets,
-                            );
-                            await api.projects();
-                            final wasSelected = existing == null ||
-                                ref.read(currentInstanceProvider).id ==
-                                    existing.id;
-                            await store.save(
-                              instance,
-                              secrets.apiKey,
-                              caPemBundle: secrets.caPemBundle,
-                              clientPkcs12: secrets.clientPkcs12,
-                              clientPkcs12Password:
-                                  secrets.clientPkcs12Password,
-                              setActiveInstance: wasSelected,
-                            );
-                            if (wasSelected) {
-                              ref.read(currentInstanceProvider.notifier).state =
-                                  instance;
-                              ref.read(repositoryProvider.notifier).state =
-                                  RealDokployRepository(api);
-                              _invalidateData(ref);
-                            }
-                            ref.invalidate(instancesProvider);
-                            if (sheetContext.mounted) {
-                              Navigator.pop(sheetContext);
-                            }
-                            if (context.mounted) {
-                              DployGoNotice.show(
-                                context,
-                                message: existing == null
-                                    ? 'Dokploy instance connected.'
-                                    : 'Connection settings updated.',
-                                tone: DployGoNoticeTone.success,
+                    if (authMode == InstanceAuthMode.clientCertificate)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(6, 8, 6, 0),
+                        child: Text(
+                          'Client-certificate-only authentication requires a reverse proxy that authorizes the certificate. Dokploy may still return 401 when its API-key authentication is enabled.',
+                          style: TextStyle(
+                            color: DokployTheme.warning,
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                  ],
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(error!,
+                          style: const TextStyle(color: DokployTheme.danger)),
+                    ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            var normalized = url.text.trim();
+                            while (normalized.endsWith('/')) {
+                              normalized = normalized.substring(
+                                0,
+                                normalized.length - 1,
                               );
                             }
-                          } catch (failure) {
+                            final uri = Uri.tryParse(normalized);
+                            final needsApiKey =
+                                authMode != InstanceAuthMode.clientCertificate;
+                            final needsClientCertificate =
+                                authMode != InstanceAuthMode.apiKey;
+                            if (uri == null ||
+                                uri.scheme != 'https' ||
+                                uri.host.isEmpty ||
+                                (needsApiKey && key.text.trim().isEmpty) ||
+                                (needsClientCertificate &&
+                                    clientPkcs12 == null)) {
+                              setLocalState(
+                                () => error =
+                                    'Enter a valid HTTPS URL and all required authentication data.',
+                              );
+                              return;
+                            }
                             setLocalState(() {
-                              busy = false;
-                              error = 'Connection failed: $failure';
+                              busy = true;
+                              error = null;
                             });
-                          }
-                        },
-                  icon: busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.link),
-                  label: Text(busy
-                      ? 'Testing…'
-                      : existing == null
-                          ? 'Test & save'
-                          : 'Test & update'),
-                ),
-                const SizedBox(height: 6),
-                TextButton(
-                  onPressed: busy ? null : () => Navigator.pop(sheetContext),
-                  child: const Text('Cancel'),
-                ),
-              ],
+                            try {
+                              final instance = DokployInstance(
+                                id: existing?.id ??
+                                    DateTime.now()
+                                        .microsecondsSinceEpoch
+                                        .toString(),
+                                name: name.text.trim().isEmpty
+                                    ? uri.host
+                                    : name.text.trim(),
+                                baseUrl: normalized,
+                                version: existing?.version ?? 'unknown',
+                                authMode: authMode,
+                                hasCustomCa: caPemBundle.isNotEmpty,
+                                hasClientCertificate: clientPkcs12 != null,
+                                caFileName: caFileName,
+                                clientCertificateFileName:
+                                    clientCertificateFileName,
+                              );
+                              final secrets = InstanceSecrets(
+                                apiKey: key.text.trim(),
+                                caPemBundle: caPemBundle,
+                                clientPkcs12: clientPkcs12,
+                                clientPkcs12Password: certificatePassword.text,
+                              );
+                              final api = DokployApi.forInstance(
+                                instance: instance,
+                                secrets: secrets,
+                              );
+                              await ref
+                                  .read(instanceConnectionProbeProvider)(api);
+                              final wasSelected = existing == null ||
+                                  ref.read(currentInstanceProvider).id ==
+                                      existing.id;
+                              await store.save(
+                                instance,
+                                secrets.apiKey,
+                                caPemBundle: secrets.caPemBundle,
+                                clientPkcs12: secrets.clientPkcs12,
+                                clientPkcs12Password:
+                                    secrets.clientPkcs12Password,
+                                setActiveInstance: wasSelected,
+                              );
+                              if (sheetContext.mounted) {
+                                Navigator.pop(
+                                  sheetContext,
+                                  (
+                                    instance: instance,
+                                    api: api,
+                                    activate: wasSelected,
+                                  ),
+                                );
+                              }
+                            } catch (failure) {
+                              setLocalState(() {
+                                busy = false;
+                                error = 'Connection failed: $failure';
+                              });
+                            }
+                          },
+                    icon: busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.link),
+                    label: Text(busy
+                        ? 'Testing…'
+                        : existing == null
+                            ? 'Test & save'
+                            : 'Test & update'),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: busy ? null : () => Navigator.pop(sheetContext),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+    await sheetDismissed;
     url.dispose();
     key.dispose();
     name.dispose();
     certificatePassword.dispose();
+    if (saved == null || !context.mounted) return;
+    if (saved.activate) {
+      ref.read(currentInstanceProvider.notifier).state = saved.instance;
+      ref.read(repositoryProvider.notifier).state =
+          RealDokployRepository(saved.api);
+      _invalidateData(ref);
+    }
+    ref.invalidate(instancesProvider);
+    await WidgetsBinding.instance.endOfFrame;
+    if (context.mounted) {
+      DployGoNotice.show(
+        context,
+        message: existing == null
+            ? 'Dokploy instance connected.'
+            : 'Connection settings updated.',
+        tone: DployGoNoticeTone.success,
+      );
+    }
   }
 
   Future<List<({String name, Uint8List bytes})>> _pickFiles(
