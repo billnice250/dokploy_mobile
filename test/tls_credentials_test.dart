@@ -23,6 +23,35 @@ void main() {
     expect(X509.fromPem(p7b).der, X509.fromPem(pem).der);
   });
 
+  test('shows CN, SHA-1 thumbprint and validity for an imported CA', () {
+    final pem = normalizeTrustBundle(base64Decode(_pemCertificate));
+    final summary = inspectTrustBundle(pem).single;
+
+    expect(summary.commonName, 'DployGo-Test-CA');
+    expect(summary.sha1Thumbprint.split(':'), hasLength(20));
+    expect(summary.notAfter.isAfter(summary.notBefore), isTrue);
+    expect(
+      () => validateCertificateValidity(
+        [summary],
+        now: DateTime.utc(2026, 8, 16, 12),
+      ),
+      returnsNormally,
+    );
+  });
+
+  test('rejects an expired parsed certificate', () {
+    final pem = normalizeTrustBundle(base64Decode(_pemCertificate));
+    final summary = inspectTrustBundle(pem).single;
+
+    expect(
+      () => validateCertificateValidity(
+        [summary],
+        now: DateTime.utc(2030),
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('rejects files that do not contain certificates', () {
     expect(
       () => normalizeTrustBundle(Uint8List.fromList(utf8.encode('not a CA'))),

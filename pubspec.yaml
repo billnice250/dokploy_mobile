@@ -23,7 +23,7 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   file_picker: ^11.0.3
   pkcs7: ^1.0.6
-
+  pfx_reader: ^1.0.6
 dev_dependencies:
   flutter_test:
     sdk: flutter

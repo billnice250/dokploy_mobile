@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/providers.dart';
@@ -387,8 +388,25 @@ class SettingsScreen extends ConsumerWidget {
     var caFileName = existing?.caFileName ?? '';
     var clientPkcs12 = savedSecrets.clientPkcs12;
     var clientCertificateFileName = existing?.clientCertificateFileName ?? '';
+    var caCertificates = <CertificateSummary>[];
+    CertificateSummary? clientCertificate;
+    String? certificateError;
+    try {
+      if (caPemBundle.isNotEmpty) {
+        caCertificates = inspectTrustBundle(caPemBundle);
+      }
+      if (clientPkcs12 != null) {
+        clientCertificate = await inspectClientPkcs12(
+          clientPkcs12,
+          certificatePassword.text,
+        );
+      }
+    } catch (failure) {
+      certificateError = 'Saved certificate validation failed: $failure';
+    }
+    if (!context.mounted) return;
     var busy = false;
-    String? error;
+    String? error = certificateError;
     Future<dynamic>? sheetDismissed;
 
     final saved = await showModalBottomSheet<
@@ -524,6 +542,7 @@ class SettingsScreen extends ConsumerWidget {
                                       : () => setLocalState(() {
                                             caPemBundle = '';
                                             caFileName = '';
+                                            caCertificates = [];
                                           }),
                                   icon: const Icon(Icons.close_rounded),
                                 ),
@@ -540,8 +559,12 @@ class SettingsScreen extends ConsumerWidget {
                                         .map((file) =>
                                             normalizeTrustBundle(file.bytes))
                                         .join('\n');
+                                    final certificates =
+                                        inspectTrustBundle(normalized);
+                                    validateCertificateValidity(certificates);
                                     setLocalState(() {
                                       caPemBundle = normalized;
+                                      caCertificates = certificates;
                                       caFileName = picked
                                           .map((file) => file.name)
                                           .join(', ');
@@ -553,6 +576,8 @@ class SettingsScreen extends ConsumerWidget {
                                   }
                                 },
                         ),
+                        for (final certificate in caCertificates)
+                          _CertificateDetails(certificate: certificate),
                         const Padding(
                           padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
                           child: Text(
@@ -587,6 +612,7 @@ class SettingsScreen extends ConsumerWidget {
                                         : () => setLocalState(() {
                                               clientPkcs12 = null;
                                               clientCertificateFileName = '';
+                                              clientCertificate = null;
                                               certificatePassword.clear();
                                             }),
                                     icon: const Icon(Icons.close_rounded),
@@ -602,23 +628,78 @@ class SettingsScreen extends ConsumerWidget {
                                     setLocalState(() {
                                       clientPkcs12 = picked.bytes;
                                       clientCertificateFileName = picked.name;
+                                      clientCertificate = null;
                                       error = null;
                                     });
+                                    try {
+                                      final summary = await inspectClientPkcs12(
+                                        picked.bytes,
+                                        certificatePassword.text,
+                                      );
+                                      if (!sheetContext.mounted) return;
+                                      setLocalState(
+                                        () => clientCertificate = summary,
+                                      );
+                                    } catch (failure) {
+                                      if (!sheetContext.mounted) return;
+                                      setLocalState(() => error =
+                                          'Enter the correct certificate password, then validate: $failure');
+                                    }
                                   },
                           ),
                           if (clientPkcs12 != null)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                              child: TextField(
-                                controller: certificatePassword,
-                                obscureText: true,
-                                enableSuggestions: false,
-                                autocorrect: false,
-                                decoration: const InputDecoration(
-                                  labelText: 'Certificate password',
-                                  hintText: 'Leave empty if unprotected',
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TextField(
+                                    controller: certificatePassword,
+                                    obscureText: true,
+                                    enableSuggestions: false,
+                                    autocorrect: false,
+                                    onChanged: (_) => setLocalState(
+                                      () => clientCertificate = null,
+                                    ),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Certificate password',
+                                      hintText: 'Leave empty if unprotected',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
+                                    onPressed: busy
+                                        ? null
+                                        : () async {
+                                            try {
+                                              final summary =
+                                                  await inspectClientPkcs12(
+                                                clientPkcs12!,
+                                                certificatePassword.text,
+                                              );
+                                              if (!sheetContext.mounted) return;
+                                              setLocalState(() {
+                                                clientCertificate = summary;
+                                                error = null;
+                                              });
+                                            } catch (failure) {
+                                              if (!sheetContext.mounted) return;
+                                              setLocalState(() => error =
+                                                  'Client certificate validation failed: $failure');
+                                            }
+                                          },
+                                    icon: const Icon(Icons.verified_outlined),
+                                    label: Text(clientCertificate == null
+                                        ? 'Validate certificate'
+                                        : 'Certificate validated'),
+                                  ),
+                                ],
                               ),
+                            ),
+                          if (clientCertificate != null)
+                            _CertificateDetails(
+                              certificate: clientCertificate!,
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                             ),
                         ],
                       ),
@@ -676,6 +757,15 @@ class SettingsScreen extends ConsumerWidget {
                               error = null;
                             });
                             try {
+                              validateCertificateValidity(caCertificates);
+                              if (needsClientCertificate) {
+                                clientCertificate = await inspectClientPkcs12(
+                                  clientPkcs12!,
+                                  certificatePassword.text,
+                                );
+                                if (!sheetContext.mounted) return;
+                                setLocalState(() {});
+                              }
                               final instance = DokployInstance(
                                 id: existing?.id ??
                                     DateTime.now()
@@ -872,6 +962,89 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       );
+}
+
+class _CertificateDetails extends StatelessWidget {
+  const _CertificateDetails({
+    required this.certificate,
+    this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 12),
+  });
+
+  final CertificateSummary certificate;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final expired = certificate.isExpired;
+    final pending = certificate.isNotYetValid;
+    final color =
+        expired || pending ? DokployTheme.danger : DokployTheme.success;
+    final status = expired
+        ? 'Expired'
+        : pending
+            ? 'Not yet valid'
+            : 'Valid';
+    final dates = DateFormat('dd MMM yyyy');
+    return Padding(
+      padding: padding,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: DokployTheme.elevated.withValues(alpha: .55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: DokployTheme.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.verified_rounded, size: 18, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    certificate.commonName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  status,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Valid ${dates.format(certificate.notBefore.toLocal())} — '
+              '${dates.format(certificate.notAfter.toLocal())}',
+              style: const TextStyle(color: DokployTheme.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'SHA-1 thumbprint',
+              style: TextStyle(color: DokployTheme.muted, fontSize: 11),
+            ),
+            const SizedBox(height: 3),
+            SelectableText(
+              certificate.sha1Thumbprint,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ApiKeyGuideContent extends StatelessWidget {
