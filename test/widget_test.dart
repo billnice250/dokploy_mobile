@@ -52,7 +52,7 @@ void main() {
     expect(find.textContaining('API/CLI Keys'), findsOneWidget);
     expect(
         find.textContaining('Treat the key like a password'), findsOneWidget);
-    Navigator.of(tester.element(find.text('Dokploy API key setup'))).pop();
+    await tester.tap(find.byTooltip('Close guide'));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -70,6 +70,28 @@ void main() {
     expect(find.text('blog.billnice.it'), findsOneWidget);
     expect(find.text('Project repository'), findsOneWidget);
     expect(find.text('Connect on LinkedIn'), findsNothing);
+  });
+
+  testWidgets('add instance sheet can be cancelled explicitly', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          instancesProvider.overrideWith((ref) async => const []),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Dokploy instance'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Cancel adding instance'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Cancel adding instance'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Cancel adding instance'), findsNothing);
   });
 
   testWidgets('unavailable server metrics fit on a compact phone',

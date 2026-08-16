@@ -168,20 +168,20 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  onTap: () => _openLink(context, _blogUri),
-                  leading: const Icon(Icons.language_outlined),
-                  title: const Text('Bill Nice — Blog & portfolio'),
-                  subtitle: const Text('blog.billnice.it'),
-                  trailing: const Icon(Icons.open_in_new_rounded),
-                ),
-                const Divider(height: 1),
-                ListTile(
                   onTap: () => _openLink(context, _repositoryUri),
                   leading: const Icon(Icons.code_rounded),
                   title: const Text('Project repository'),
                   subtitle: const Text(
                     'Source code, feature requests and issue reports',
                   ),
+                  trailing: const Icon(Icons.open_in_new_rounded),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  onTap: () => _openLink(context, _blogUri),
+                  leading: const Icon(Icons.language_outlined),
+                  title: const Text('Creator: Bill Nice — Blog & portfolio'),
+                  subtitle: const Text('blog.billnice.it'),
                   trailing: const Icon(Icons.open_in_new_rounded),
                 ),
               ],
@@ -347,6 +347,8 @@ class SettingsScreen extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setLocalState) => Padding(
@@ -361,9 +363,24 @@ class SettingsScreen extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Add Dokploy instance',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Add Dokploy instance',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cancel adding instance',
+                      onPressed:
+                          busy ? null : () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -484,6 +501,11 @@ class SettingsScreen extends ConsumerWidget {
                       : const Icon(Icons.link),
                   label: Text(busy ? 'Testing…' : 'Test & save'),
                 ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: busy ? null : () => Navigator.pop(sheetContext),
+                  child: const Text('Cancel'),
+                ),
               ],
             ),
           ),
@@ -512,18 +534,39 @@ class SettingsScreen extends ConsumerWidget {
         context: context,
         showDragHandle: true,
         isScrollControlled: true,
-        builder: (sheetContext) => const SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 28),
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .82,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Dokploy API key setup',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 12, 10),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Dokploy API key setup',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close guide',
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 16),
-                _ApiKeyGuideContent(),
+                const Divider(height: 1),
+                const Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, 28),
+                    child: _ApiKeyGuideContent(),
+                  ),
+                ),
               ],
             ),
           ),
