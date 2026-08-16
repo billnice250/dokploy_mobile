@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/dokploy-mark.png" width="180" alt="DployGo whale diving into a pocket logo">
+</p>
+
 # DployGo
 
 An **unofficial Flutter mobile console for Dokploy**, designed for operations from a phone rather than as a pixel-for-pixel port of the web dashboard.

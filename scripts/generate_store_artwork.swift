@@ -41,10 +41,10 @@ struct StoreArtwork {
         "play-store/feature-graphic/feature-graphic-1024x500.png"
       )
     )
-    try flattenStoreScreenshots()
+    try flattenStoreScreenshots(mark: mark)
   }
 
-  private func flattenStoreScreenshots() throws {
+  private func flattenStoreScreenshots(mark: NSImage) throws {
     guard let files = FileManager.default.enumerator(
       at: outputRoot,
       includingPropertiesForKeys: nil
@@ -67,8 +67,46 @@ struct StoreArtwork {
         NSColor.black.setFill()
         rect.fill()
         image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+        if let brandRect = screenshotBrandRect(
+          file: file,
+          width: representation.pixelsWide,
+          height: representation.pixelsHigh
+        ) {
+          mark.draw(
+            in: brandRect,
+            from: .zero,
+            operation: .sourceOver,
+            fraction: 1
+          )
+        }
       }
     }
+  }
+
+  private func screenshotBrandRect(
+    file: URL,
+    width: Int,
+    height: Int
+  ) -> NSRect? {
+    let components = file.pathComponents
+    let placement: (x: CGFloat, top: CGFloat, size: CGFloat)
+
+    if components.contains("iphone-6.9") {
+      placement = (48, 225, 90)
+    } else if components.contains("phone") {
+      placement = (42, 97, 80)
+    } else if width == 2064 && height == 2752 {
+      placement = (33, 89, 60)
+    } else {
+      return nil
+    }
+
+    return NSRect(
+      x: placement.x,
+      y: CGFloat(height) - placement.top - placement.size,
+      width: placement.size,
+      height: placement.size
+    )
   }
 
   private func renderIcon(mark: NSImage, size: Int, destination: URL) throws {
