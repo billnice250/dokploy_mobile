@@ -24,6 +24,7 @@ dependencies:
   file_picker: ^11.0.3
   pkcs7: ^1.0.6
   pfx_reader: ^1.0.6
+  package_info_plus: ^9.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/providers.dart';
@@ -13,11 +14,15 @@ import '../core/appearance.dart';
 import '../core/app_notice.dart';
 import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
+import '../core/widgets.dart';
 import '../data/dokploy_api.dart';
 import '../data/mock_repository.dart';
 import '../data/real_repository.dart';
 import '../data/tls_credentials.dart';
 import '../domain/models.dart';
+
+final _packageInfoProvider =
+    FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -31,6 +36,7 @@ class SettingsScreen extends ConsumerWidget {
     final current = ref.watch(currentInstanceProvider);
     final instances = ref.watch(instancesProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final packageInfo = ref.watch(_packageInfoProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -255,6 +261,9 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 28),
+          _AppVersionFooter(packageInfo: packageInfo),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -1026,6 +1035,43 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       );
+}
+
+class _AppVersionFooter extends StatelessWidget {
+  const _AppVersionFooter({required this.packageInfo});
+
+  final AsyncValue<PackageInfo> packageInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = packageInfo.when(
+      data: (info) => 'Version ${info.version} • Build ${info.buildNumber}',
+      loading: () => 'Version information…',
+      error: (_, __) => 'Version information unavailable',
+    );
+    return Semantics(
+      label: 'DployGo $label',
+      child: Column(
+        children: [
+          const DokployBrandMark(size: 24, radius: 7),
+          const SizedBox(height: 8),
+          Text(
+            'DployGo',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: DokployTheme.mutedOf(context),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CertificateDetails extends StatelessWidget {

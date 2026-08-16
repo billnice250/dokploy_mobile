@@ -14,6 +14,7 @@ import 'package:dokploy_mobile/screens/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -33,6 +34,13 @@ void main() {
 
   testWidgets('settings shows API compatibility and author links',
       (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'DployGo',
+      packageName: 'it.billnice.apps.dokploy',
+      version: '1.0.0',
+      buildNumber: '42',
+      buildSignature: '',
+    );
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -76,6 +84,13 @@ void main() {
     expect(find.text('blog.billnice.it'), findsOneWidget);
     expect(find.text('Project repository'), findsOneWidget);
     expect(find.text('Connect on LinkedIn'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Version 1.0.0 • Build 42'),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
+    expect(find.text('Version 1.0.0 • Build 42'), findsOneWidget);
   });
 
   testWidgets('add instance sheet can be cancelled explicitly', (tester) async {
