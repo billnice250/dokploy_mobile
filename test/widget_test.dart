@@ -5,6 +5,7 @@ import 'package:dokploy_mobile/core/biometric_confirmation.dart';
 import 'package:dokploy_mobile/data/mock_repository.dart';
 import 'package:dokploy_mobile/domain/models.dart';
 import 'package:dokploy_mobile/screens/service_detail.dart';
+import 'package:dokploy_mobile/screens/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,37 @@ void main() {
     expect(find.textContaining('Demo Infrastructure'), findsOneWidget);
     expect(find.text('RECENT DEPLOYMENTS'), findsOneWidget);
     expect(find.text('Servers'), findsWidgets);
+  });
+
+  testWidgets('settings shows API compatibility and author links',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          instancesProvider.overrideWith((ref) async => const []),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Target Dokploy API'),
+      400,
+      scrollable: find.byType(Scrollable),
+    );
+    expect(find.textContaining('Dokploy v0.30.0'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Bill Nice — Blog & portfolio'),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
+    expect(find.text('blog.billnice.it'), findsOneWidget);
+    expect(find.text('Project repository'), findsOneWidget);
+    expect(find.text('Connect on LinkedIn'), findsNothing);
   });
 
   testWidgets('unavailable server metrics fit on a compact phone',

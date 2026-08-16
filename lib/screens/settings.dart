@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/providers.dart';
 import '../core/app_notice.dart';
@@ -13,6 +14,10 @@ import '../domain/models.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  static final _blogUri = Uri.parse('https://blog.billnice.it/');
+  static final _repositoryUri =
+      Uri.parse('https://github.com/billnice250/dokploy_mobile');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -109,18 +114,91 @@ class SettingsScreen extends ConsumerWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.info_outline, color: DokployTheme.warning),
-              title: Text('Version not reported'),
-              subtitle: Text(
-                'Core project access is validated at connection time. Advanced modules remain limited until their contracts are verified.',
-              ),
+          Card(
+            child: Column(
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.api_outlined),
+                  title: Text('Target Dokploy API'),
+                  subtitle: Text(
+                    'Dokploy v0.30.0 • capability fallbacks remain enabled for older instances',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.dns_outlined),
+                  title: Text(current.demo
+                      ? 'Demo compatibility adapter'
+                      : 'Connected API endpoint'),
+                  subtitle: Text(current.demo
+                      ? 'No remote Dokploy API is used in demo mode.'
+                      : _apiEndpoint(current)),
+                ),
+                const Divider(height: 1),
+                const ListTile(
+                  leading: Icon(
+                    Icons.info_outline,
+                    color: DokployTheme.warning,
+                  ),
+                  title: Text('Runtime capability detection'),
+                  subtitle: Text(
+                    'Core access is validated at connection time. Unsupported or permission-limited modules are hidden safely.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
+          const Text(
+            'About DployGo',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  onTap: () => _openLink(context, _blogUri),
+                  leading: const Icon(Icons.language_outlined),
+                  title: const Text('Bill Nice — Blog & portfolio'),
+                  subtitle: const Text('blog.billnice.it'),
+                  trailing: const Icon(Icons.open_in_new_rounded),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  onTap: () => _openLink(context, _repositoryUri),
+                  leading: const Icon(Icons.code_rounded),
+                  title: const Text('Project repository'),
+                  subtitle: const Text(
+                    'Source code, feature requests and issue reports',
+                  ),
+                  trailing: const Icon(Icons.open_in_new_rounded),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openLink(BuildContext context, Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      DployGoNotice.show(
+        context,
+        message: 'Could not open ${uri.host}.',
+        tone: DployGoNoticeTone.error,
+      );
+    }
+  }
+
+  String _apiEndpoint(DokployInstance instance) {
+    var base = instance.baseUrl.trim();
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    return base.endsWith('/api') ? base : '$base/api';
   }
 
   Widget _instanceTile(
