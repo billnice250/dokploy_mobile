@@ -1,4 +1,4 @@
-default_platform(:ios)
+default_platform(:android)
 
 platform :ios do
   desc "Upload an already signed IPA to TestFlight"
@@ -19,13 +19,14 @@ platform :ios do
 end
 
 platform :android do
-  desc "Upload an already signed AAB to a Google Play track using ADC"
+  desc "Upload an already signed AAB to a Google Play track using WIF"
   lane :deploy do |options|
     track = options.fetch(:track, "internal")
     allowed_tracks = %w[internal alpha beta production]
     UI.user_error!("Unsupported Play track: #{track}") unless allowed_tracks.include?(track)
 
     upload_to_play_store(
+      json_key: ENV.fetch("GOOGLE_APPLICATION_CREDENTIALS"),
       aab: ENV.fetch("ANDROID_AAB_PATH"),
       package_name: "it.billnice.apps.dokploy",
       track: track,
