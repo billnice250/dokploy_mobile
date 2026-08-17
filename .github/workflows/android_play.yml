@@ -39,13 +39,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate Google release configuration
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          : "${GCP_PROJECT_ID:?Repository variable GCP_PROJECT_ID is required}"
+          : "${GCP_WIF_PROVIDER:?Repository variable GCP_WIF_PROVIDER is required}"
+          : "${GCP_SERVICE_ACCOUNT:?Repository variable GCP_SERVICE_ACCOUNT is required}"
+
       - id: preflight-auth
         name: Authenticate to Google Cloud (preflight)
         uses: google-github-actions/auth@v3
         with:
-          project_id: "bill-apps-ci-build"
-          workload_identity_provider: "projects/96345954330/locations/global/workloadIdentityPools/github/providers/github-provider"
-          service_account: "moneytone@bill-apps-ci-build.iam.gserviceaccount.com"
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_scopes: "https://www.googleapis.com/auth/androidpublisher"
 
@@ -171,9 +181,9 @@ jobs:
         name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          project_id: "bill-apps-ci-build"
-          workload_identity_provider: "projects/96345954330/locations/global/workloadIdentityPools/github/providers/github-provider"
-          service_account: "moneytone@bill-apps-ci-build.iam.gserviceaccount.com"
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
           export_environment_variables: true
 

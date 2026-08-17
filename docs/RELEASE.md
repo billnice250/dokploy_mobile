@@ -35,6 +35,20 @@ The workflow uses these existing Google Cloud resources:
 - Service account:
   `moneytone@bill-apps-ci-build.iam.gserviceaccount.com`
 
+Add their identifiers under **GitHub → Settings → Secrets and variables →
+Actions → Variables**:
+
+| Repository variable | Value |
+| --- | --- |
+| `GCP_PROJECT_ID` | `bill-apps-ci-build` |
+| `GCP_WIF_PROVIDER` | `projects/96345954330/locations/global/workloadIdentityPools/github/providers/github-provider` |
+| `GCP_SERVICE_ACCOUNT` | `moneytone@bill-apps-ci-build.iam.gserviceaccount.com` |
+
+These are resource identifiers, not credentials. Repository variables keep
+deployment configuration out of the workflow while encrypted secrets remain
+reserved for keystores, passwords, tokens, and private keys. The workflow
+checks that all three variables exist before attempting authentication.
+
 The provider must admit this repository’s `main` branch and release tags.
 Inspect the live provider before changing it:
 
