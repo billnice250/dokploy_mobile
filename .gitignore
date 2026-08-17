@@ -11,6 +11,7 @@ build/
 android/.gradle/
 android/key.properties
 android/keystore.p12
+android/signing-secrets.env.secret
 ios/Pods/
 .env
 *.log

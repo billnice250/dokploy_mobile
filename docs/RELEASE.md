@@ -101,11 +101,26 @@ OAuth access token instead points to the service-account IAM binding.
    - `ANDROID_KEY_ALIAS`
    - `ANDROID_KEY_PASSWORD` (optional when it matches the store password)
 
-Encode the keystore without line wrapping:
+Generate the upload keystore and set all four secrets directly with the GitHub
+CLI:
 
 ```bash
-base64 < android-upload-keystore.p12 | tr -d '\n'
+./scripts/generate_android_signing_secrets.sh --set-github
 ```
+
+The command requires an authenticated `gh` CLI. To enter the values manually
+in GitHub instead, explicitly print them:
+
+```bash
+./scripts/generate_android_signing_secrets.sh --print
+```
+
+Printed values are sensitive. The generated `android/keystore.p12` is ignored
+by Git. Direct GitHub setup also creates the Git-ignored, permission-restricted
+`android/signing-secrets.env.secret`, because GitHub secrets cannot be read
+back. Back up the keystore and recovery values in a secure location, then
+remove the local recovery file. Losing the upload key or password can prevent
+future app updates.
 
 The workflow writes temporary `android/key.properties` and
 `android/keystore.p12` files on the GitHub runner. Both paths are ignored by
