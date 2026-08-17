@@ -19,18 +19,26 @@ platform :ios do
 end
 
 platform :android do
-  desc "Upload an already signed AAB to the Google Play internal track"
-  lane :internal do
+  desc "Upload an already signed AAB to a Google Play track using ADC"
+  lane :deploy do |options|
+    track = options.fetch(:track, "internal")
+    allowed_tracks = %w[internal alpha beta production]
+    UI.user_error!("Unsupported Play track: #{track}") unless allowed_tracks.include?(track)
+
     upload_to_play_store(
       aab: ENV.fetch("ANDROID_AAB_PATH"),
-      json_key_data: ENV.fetch("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"),
       package_name: "it.billnice.apps.dokploy",
-      track: "internal",
+      track: track,
       release_status: "draft",
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
       skip_upload_changelogs: true
     )
+  end
+
+  desc "Upload an already signed AAB to Google Play internal testing"
+  lane :internal do
+    deploy(track: "internal")
   end
 end

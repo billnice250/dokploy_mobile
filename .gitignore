@@ -9,6 +9,8 @@ build/
 .vscode/
 *.iml
 android/.gradle/
+android/key.properties
+android/keystore.p12
 ios/Pods/
 .env
 *.log

@@ -2,19 +2,30 @@ name: Android → Play Console
 
 on:
   push:
-    branches: ["master"]
+    branches: ["main"]
   workflow_dispatch:
     inputs:
       track:
-        description: "Play track (internal, closed, open, production)"
+        description: "Play track"
         required: true
         default: "internal"
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
       build_number:
-        description: "Override build number (versionCode)"
+        description: "Override versionCode (positive integer)"
         required: false
         default: ""
+        type: string
   release:
     types: [published]
+
+concurrency:
+  group: android-play-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -22,86 +33,151 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write  # REQUIRED for Workload Identity Federation (GitHub OIDC)
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug GitHub ref
+      - id: preflight-auth
+        name: Authenticate to Google Cloud (preflight)
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: "bill-apps-ci-build"
+          workload_identity_provider: "projects/96345954330/locations/global/workloadIdentityPools/github/providers/github-provider"
+          service_account: "moneytone@bill-apps-ci-build.iam.gserviceaccount.com"
+          token_format: access_token
+          access_token_scopes: "https://www.googleapis.com/auth/androidpublisher"
+
+      - name: Verify Play Console access
+        env:
+          ACCESS_TOKEN: ${{ steps.preflight-auth.outputs.access_token }}
+          PACKAGE_NAME: "it.billnice.apps.dokploy"
         run: |
-          echo "event: ${{ github.event_name }}"
-          echo "ref:   ${{ github.ref }}"
-          echo "repo:  ${{ github.repository }}"
-          
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer $ACCESS_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data '{}' \
+            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits")"
+
+          if [[ "$status" != "200" ]]; then
+            echo "Google Play preflight failed with HTTP $status" >&2
+            jq -c '{error: .error}' "$response_file" 2>/dev/null || true
+            exit 1
+          fi
+
+          edit_id="$(jq -r '.id // empty' "$response_file")"
+          if [[ -z "$edit_id" ]]; then
+            echo "Google Play returned no edit ID" >&2
+            exit 1
+          fi
+
+          delete_status="$(curl --silent --show-error \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            --request DELETE \
+            --header "Authorization: Bearer $ACCESS_TOKEN" \
+            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$edit_id")"
+
+          if [[ "$delete_status" != "200" && "$delete_status" != "204" ]]; then
+            echo "Created preflight edit $edit_id but could not delete it (HTTP $delete_status)" >&2
+            exit 1
+          fi
+
+          echo "Workload Identity and Google Play edit access verified."
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.44.1"
           cache: true
 
-      # ✅ Keyless auth to Google via Workload Identity Federation
-      - name: Auth to Google (WIF)
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Resolve release settings
+        env:
+          REQUESTED_BUILD_NUMBER: ${{ inputs.build_number || '' }}
+          REQUESTED_TRACK: ${{ inputs.track || '' }}
+        run: |
+          if [[ -n "$REQUESTED_BUILD_NUMBER" ]]; then
+            if [[ ! "$REQUESTED_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "build_number must be a positive integer" >&2
+              exit 1
+            fi
+            build_number="$REQUESTED_BUILD_NUMBER"
+          else
+            build_number="$((20 + GITHUB_RUN_NUMBER))"
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+            play_track="production"
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            play_track="$REQUESTED_TRACK"
+          else
+            play_track="internal"
+          fi
+
+          case "$play_track" in
+            internal|alpha|beta|production) ;;
+            *)
+              echo "Unsupported Play track: $play_track" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "PLAY_TRACK=$play_track" >> "$GITHUB_ENV"
+
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          : "${ANDROID_KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 is required}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD is required}"
+          : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS is required}"
+
+          key_password="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/keystore.p12
+          {
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$key_password"
+            printf 'storeFile=../keystore.p12\n'
+            printf 'storePassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD"
+          } > android/key.properties
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+      - name: Build signed app bundle
+        run: flutter build appbundle --release --build-number "$BUILD_NUMBER"
+
+      # Authenticate immediately before upload so the short-lived GitHub OIDC
+      # credential does not expire during dependency installation or the build.
+      - id: google-auth
+        name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
+          project_id: "bill-apps-ci-build"
           workload_identity_provider: "projects/96345954330/locations/global/workloadIdentityPools/github/providers/github-provider"
           service_account: "moneytone@bill-apps-ci-build.iam.gserviceaccount.com"
           create_credentials_file: true
           export_environment_variables: true
 
-      - name: Debug ADC file
-        run: |
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS"
-          ls -lah "$GOOGLE_APPLICATION_CREDENTIALS"
-          
-      - name: Setup Ruby for Fastlane
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.2"
-          bundler-cache: true
-          working-directory: android
-
-      # ---- Android signing (key.properties) ----
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/keystore.p12
-
-      - name: Write signing password file
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/keystore.pass
-
-      - name: Create key.properties
-        run: |
-          cat > android/key.properties <<EOF
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=keystore.p12
-          passwordFile=keystore.pass
-          EOF
-          if [ -n "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
-            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
-          fi
-
-      - name: Bundle install
-        working-directory: android
-        run: bundle install
-
-      - name: Compute build number (start at 20)
-        run: |
-          if [ -n "${{ inputs.build_number }}" ]; then
-            echo "BUILD_NUMBER=${{ inputs.build_number }}" >> $GITHUB_ENV
-          else
-            echo "BUILD_NUMBER=$((20 + ${{ github.run_number }}))" >> $GITHUB_ENV
-          fi
-      - name: Deploy to Play
-        working-directory: android
+      - name: Upload to Play Console
         env:
-          BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
-          # GOOGLE_APPLICATION_CREDENTIALS is set automatically by the auth step
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            bundle exec fastlane android deploy track:production
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            bundle exec fastlane android deploy track:${{ inputs.track }} build_number:${{ env.BUILD_NUMBER }}
-          else
-            bundle exec fastlane android deploy track:internal
-          fi
+          ANDROID_AAB_PATH: build/app/outputs/bundle/release/app-release.aab
+        run: bundle exec fastlane android deploy track:"$PLAY_TRACK"
