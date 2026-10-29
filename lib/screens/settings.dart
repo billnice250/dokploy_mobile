@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -951,23 +950,29 @@ class SettingsScreen extends ConsumerWidget {
     List<String> extensions, {
     bool allowMultiple = false,
   }) async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: extensions,
-      withData: true,
-      allowMultiple: allowMultiple,
-    );
-    if (result == null) return const [];
-    final files = <({String name, Uint8List bytes})>[];
-    for (final file in result.files) {
-      final bytes = file.bytes ??
-          (file.path == null ? null : await File(file.path!).readAsBytes());
-      if (bytes == null || bytes.isEmpty) {
+    final selectedFiles = allowMultiple
+        ? await FilePicker.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: extensions,
+          )
+        : [
+            if (await FilePicker.pickFile(
+              type: FileType.custom,
+              allowedExtensions: extensions,
+            )
+                case final file?)
+              file,
+          ];
+    if (selectedFiles.isEmpty) return const [];
+    final pickedFiles = <({String name, Uint8List bytes})>[];
+    for (final file in selectedFiles) {
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
         throw FormatException('${file.name} is empty.');
       }
-      files.add((name: file.name, bytes: bytes));
+      pickedFiles.add((name: file.name, bytes: bytes));
     }
-    return files;
+    return pickedFiles;
   }
 
   bool _hasRequiredCredentials(

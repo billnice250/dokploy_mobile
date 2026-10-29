@@ -1,43 +1,13 @@
 PODS:
-  - DKImagePickerController/Core (4.3.9):
-    - DKImagePickerController/ImageDataManager
-    - DKImagePickerController/Resource
-  - DKImagePickerController/ImageDataManager (4.3.9)
-  - DKImagePickerController/PhotoGallery (4.3.9):
-    - DKImagePickerController/Core
-    - DKPhotoGallery
-  - DKImagePickerController/Resource (4.3.9)
-  - DKPhotoGallery (0.0.19):
-    - DKPhotoGallery/Core (= 0.0.19)
-    - DKPhotoGallery/Model (= 0.0.19)
-    - DKPhotoGallery/Preview (= 0.0.19)
-    - DKPhotoGallery/Resource (= 0.0.19)
-    - SDWebImage
-    - SwiftyGif
-  - DKPhotoGallery/Core (0.0.19):
-    - DKPhotoGallery/Model
-    - DKPhotoGallery/Preview
-    - SDWebImage
-    - SwiftyGif
-  - DKPhotoGallery/Model (0.0.19):
-    - SDWebImage
-    - SwiftyGif
-  - DKPhotoGallery/Preview (0.0.19):
-    - DKPhotoGallery/Model
-    - DKPhotoGallery/Resource
-    - SDWebImage
-    - SwiftyGif
-  - DKPhotoGallery/Resource (0.0.19):
-    - SDWebImage
-    - SwiftyGif
-  - file_picker (0.0.1):
-    - DKImagePickerController/PhotoGallery
+  - file_picker_darwin (1.0.0):
     - Flutter
+    - FlutterMacOS
   - Flutter (1.0.0)
   - flutter_local_notifications (0.0.1):
     - Flutter
-  - flutter_secure_storage (6.0.0):
+  - flutter_secure_storage_darwin (10.0.0):
     - Flutter
+    - FlutterMacOS
   - local_auth_darwin (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -48,21 +18,17 @@ PODS:
     - FlutterMacOS
   - pfx_reader (0.0.1):
     - Flutter
-  - SDWebImage (5.21.7):
-    - SDWebImage/Core (= 5.21.7)
-  - SDWebImage/Core (5.21.7)
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
-  - SwiftyGif (5.4.5)
   - url_launcher_ios (0.0.1):
     - Flutter
 
 DEPENDENCIES:
-  - file_picker (from `.symlinks/plugins/file_picker/ios`)
+  - file_picker_darwin (from `.symlinks/plugins/file_picker_darwin/darwin`)
   - Flutter (from `Flutter`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
-  - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
+  - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -70,22 +36,15 @@ DEPENDENCIES:
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
-SPEC REPOS:
-  trunk:
-    - DKImagePickerController
-    - DKPhotoGallery
-    - SDWebImage
-    - SwiftyGif
-
 EXTERNAL SOURCES:
-  file_picker:
-    :path: ".symlinks/plugins/file_picker/ios"
+  file_picker_darwin:
+    :path: ".symlinks/plugins/file_picker_darwin/darwin"
   Flutter:
     :path: Flutter
   flutter_local_notifications:
     :path: ".symlinks/plugins/flutter_local_notifications/ios"
-  flutter_secure_storage:
-    :path: ".symlinks/plugins/flutter_secure_storage/ios"
+  flutter_secure_storage_darwin:
+    :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
   local_auth_darwin:
     :path: ".symlinks/plugins/local_auth_darwin/darwin"
   package_info_plus:
@@ -100,19 +59,15 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
-  DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
-  DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
-  file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
+  file_picker_darwin: 4c2b9a50ea44cb3b071381ea0cf48591bdd80251
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_local_notifications: 643a3eda1ce1c0599413ca31672536d423dee214
-  flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
+  flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   pfx_reader: b536fdab6a33798a4d995baac2e3b4e9df82a3ad
-  SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
-  SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
 PODFILE CHECKSUM: 7f2cc976b5ed24ad0a5bd664dbfc364f9edb7084
