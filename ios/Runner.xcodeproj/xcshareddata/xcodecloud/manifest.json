@@ -1,0 +1,9 @@
+{
+  "id" : "a57431fe-7e8b-42bc-a14c-aa4ad30bd175",
+  "targets" : [
+    {
+      "id" : "A99D27BA-72FE-47FA-AE7D-F0FB6C25EC5D",
+      "name" : "dokploy_mobile"
+    }
+  ]
+}
