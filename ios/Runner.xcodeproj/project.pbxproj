@@ -132,6 +132,7 @@
 				45462ECA0BC4827BA6256A5A /* DployGoWidget.entitlements */,
 			);
 			name = DployGoWidget;
+			path = DployGoWidget;
 			sourceTree = "<group>";
 		};
 		22EE89C99938998204A2375D /* Pods */ = {
