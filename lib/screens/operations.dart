@@ -33,9 +33,13 @@ class OperationsScreen extends ConsumerWidget {
           _nav(Icons.language, 'Domains', 'Routes, HTTPS and target ports',
               capabilities?.domains == true ? () => _showDomains(c, ref) : null,
               upcoming: capabilities?.domains != true),
-          _nav(Icons.storage, 'Databases',
-              'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', null,
-              upcoming: true),
+          _nav(
+            Icons.storage,
+            'Databases',
+            'PostgreSQL, MySQL, MariaDB, MongoDB and Redis',
+            capabilities?.databases == true ? () => c.push('/databases') : null,
+            upcoming: capabilities?.databases != true,
+          ),
           _nav(
               Icons.swap_vert_rounded,
               'Traefik requests',
@@ -50,9 +54,11 @@ class OperationsScreen extends ConsumerWidget {
               'Notifications',
               'Deployment changes and local notification history',
               () => c.push('/notifications')),
-          _nav(Icons.widgets_outlined, 'Widgets & shortcuts',
-              'Home-screen health and quick actions', null,
-              upcoming: true),
+          _nav(
+              Icons.widgets_outlined,
+              'Home-screen widget',
+              'Infrastructure health on your home screen',
+              () => c.push('/widgets')),
         ]));
   }
 

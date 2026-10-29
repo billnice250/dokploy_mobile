@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -295,7 +296,11 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
   bool _supportsLifecycle(ServiceKind kind) =>
       kind == ServiceKind.application ||
       kind == ServiceKind.compose ||
-      kind == ServiceKind.postgres;
+      kind == ServiceKind.postgres ||
+      kind == ServiceKind.mysql ||
+      kind == ServiceKind.mariadb ||
+      kind == ServiceKind.mongo ||
+      kind == ServiceKind.redis;
 
   Future<void> _confirmStop(BuildContext context, ServiceModel service) async {
     final confirmed = await showDialog<bool>(
@@ -613,7 +618,7 @@ class _LogsState extends ConsumerState<_Logs> {
   Stream<List<String>>? liveRequest;
 
   Future<List<String>> _load() =>
-      ref.read(repositoryProvider).logs(widget.service.id, tail: tail);
+      ref.read(repositoryProvider).logs(widget.service, tail: tail);
 
   @override
   void initState() {
@@ -878,11 +883,28 @@ class _ConfigState extends ConsumerState<_Config> {
   bool _loading = false;
   bool _saving = false;
   bool _revealed = false;
+  bool _networksLoading = true;
+  Object? _networksError;
+  Map<String, dynamic> _networkSettings = const {};
+  bool _databaseSettingsLoading = true;
+  Object? _databaseSettingsError;
+  Map<String, dynamic> _databaseSettings = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNetworkSettings();
+    _loadDatabaseSettings();
+  }
 
   @override
   void didUpdateWidget(covariant _Config oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.service.id != widget.service.id) _hide();
+    if (oldWidget.service.id != widget.service.id) {
+      _hide();
+      _loadNetworkSettings();
+      _loadDatabaseSettings();
+    }
   }
 
   @override
@@ -899,6 +921,208 @@ class _ConfigState extends ConsumerState<_Config> {
     _error = null;
     _revealed = false;
   }
+
+  Future<void> _loadNetworkSettings() async {
+    setState(() {
+      _networksLoading = true;
+      _networksError = null;
+      _networkSettings = const {};
+    });
+    try {
+      final settings =
+          await ref.read(repositoryProvider).networkSettings(widget.service);
+      if (mounted) setState(() => _networkSettings = settings);
+    } catch (error) {
+      if (mounted) setState(() => _networksError = error);
+    } finally {
+      if (mounted) setState(() => _networksLoading = false);
+    }
+  }
+
+  Future<void> _loadDatabaseSettings() async {
+    if (!_isDatabaseService) {
+      _databaseSettingsLoading = false;
+      return;
+    }
+    setState(() {
+      _databaseSettingsLoading = true;
+      _databaseSettingsError = null;
+      _databaseSettings = const {};
+    });
+    try {
+      final settings =
+          await ref.read(repositoryProvider).databaseSettings(widget.service);
+      if (mounted) setState(() => _databaseSettings = settings);
+    } catch (error) {
+      if (mounted) setState(() => _databaseSettingsError = error);
+    } finally {
+      if (mounted) setState(() => _databaseSettingsLoading = false);
+    }
+  }
+
+  bool get _isDatabaseService => switch (widget.service.kind) {
+        ServiceKind.postgres ||
+        ServiceKind.mysql ||
+        ServiceKind.mariadb ||
+        ServiceKind.mongo ||
+        ServiceKind.redis =>
+          true,
+        _ => false,
+      };
+
+  String _settingValue(dynamic value) {
+    if (value is String || value is num || value is bool) return '$value';
+    return const JsonEncoder.withIndent('  ').convert(value);
+  }
+
+  String _settingLabel(String key) => key
+      .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'), (match) => '${match[1]} ${match[2]}')
+      .replaceAll('_', ' ')
+      .trim()
+      .split(' ')
+      .map((word) =>
+          word.isEmpty ? word : '${word[0].toUpperCase()}${word.substring(1)}')
+      .join(' ');
+
+  Widget _networkSettingsCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.hub_outlined, size: 20),
+                  const SizedBox(width: 9),
+                  const Expanded(
+                    child: Text(
+                      'Network settings',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh network settings',
+                    onPressed: _networksLoading ? null : _loadNetworkSettings,
+                    icon: const Icon(Icons.refresh, size: 19),
+                  ),
+                ],
+              ),
+              if (_networksLoading)
+                const LinearProgressIndicator()
+              else if (_networksError != null)
+                Text(
+                  'Could not load network settings: $_networksError',
+                  style: const TextStyle(color: DokployTheme.danger),
+                )
+              else if (_networkSettings.isEmpty)
+                const Text(
+                  'Dokploy did not report network settings for this service.',
+                  style: TextStyle(color: DokployTheme.muted, fontSize: 13),
+                )
+              else
+                for (final entry in _networkSettings.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 112,
+                          child: Text(
+                            _settingLabel(entry.key),
+                            style: const TextStyle(
+                              color: DokployTheme.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: SelectableText(
+                            _settingValue(entry.value),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _databaseSettingsCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.storage_outlined, size: 20),
+                  const SizedBox(width: 9),
+                  const Expanded(
+                    child: Text(
+                      'Database settings',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh database settings',
+                    onPressed:
+                        _databaseSettingsLoading ? null : _loadDatabaseSettings,
+                    icon: const Icon(Icons.refresh, size: 19),
+                  ),
+                ],
+              ),
+              if (_databaseSettingsLoading)
+                const LinearProgressIndicator()
+              else if (_databaseSettingsError != null)
+                Text(
+                  'Could not load database settings: $_databaseSettingsError',
+                  style: const TextStyle(color: DokployTheme.danger),
+                )
+              else if (_databaseSettings.isEmpty)
+                const Text(
+                  'No database settings were reported.',
+                  style: TextStyle(color: DokployTheme.muted, fontSize: 13),
+                )
+              else
+                for (final entry in _databaseSettings.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 112,
+                          child: Text(
+                            _settingLabel(entry.key),
+                            style: const TextStyle(
+                              color: DokployTheme.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: SelectableText(
+                            _settingValue(entry.value),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      );
 
   Future<void> _requestHide() async {
     if (_hasChanges) {
@@ -1054,6 +1278,12 @@ class _ConfigState extends ConsumerState<_Config> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
+                if (_isDatabaseService) ...[
+                  _databaseSettingsCard(),
+                  const SizedBox(height: 8),
+                ],
+                _networkSettingsCard(),
+                const SizedBox(height: 8),
                 if (!_revealed)
                   Card(
                     child: ListTile(

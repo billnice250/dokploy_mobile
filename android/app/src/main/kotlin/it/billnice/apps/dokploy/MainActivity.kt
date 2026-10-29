@@ -39,5 +39,28 @@ class MainActivity : FlutterFragmentActivity() {
                 result.error("PKCS12_IMPORT_FAILED", "The client certificate or password is invalid.", error.message)
             }
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "dploygo/home_widget",
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "updateSummary") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            val args = call.arguments as? Map<*, *>
+            if (args == null) {
+                result.error("INVALID_ARGUMENT", "Widget summary is required.", null)
+                return@setMethodCallHandler
+            }
+            getSharedPreferences("dploygo_widget", MODE_PRIVATE).edit()
+                .putString("instanceName", args["instanceName"] as? String ?: "DployGo")
+                .putInt("running", (args["running"] as? Number)?.toInt() ?: 0)
+                .putInt("stopped", (args["stopped"] as? Number)?.toInt() ?: 0)
+                .putInt("failed", (args["failed"] as? Number)?.toInt() ?: 0)
+                .putString("updatedAt", args["updatedAt"] as? String ?: "")
+                .apply()
+            InfrastructureWidgetProvider.updateAll(this)
+            result.success(true)
+        }
     }
 }

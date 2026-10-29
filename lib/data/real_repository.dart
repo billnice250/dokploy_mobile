@@ -652,6 +652,63 @@ class RealDokployRepository implements DokployRepository {
     return '$raw';
   }
 
+  @override
+  Future<Map<String, dynamic>> networkSettings(ServiceModel service) async {
+    final raw = await api.serviceConfiguration(
+      _resourceName(service.kind),
+      _idKey(service.kind),
+      service.id,
+    );
+    if (raw is! Map) return const {};
+    final settings = <String, dynamic>{};
+    for (final entry in raw.entries) {
+      final key = '${entry.key}';
+      final normalized = key.toLowerCase();
+      if (normalized.contains('network') ||
+          const {'ipam', 'ipv4address', 'ipv6address', 'attachable'}
+              .contains(normalized)) {
+        settings[key] = entry.value;
+      }
+    }
+    return settings;
+  }
+
+  @override
+  Future<Map<String, dynamic>> databaseSettings(ServiceModel service) async {
+    if (!_isDatabase(service.kind)) return const {};
+    final raw = await api.serviceConfiguration(
+      _resourceName(service.kind),
+      _idKey(service.kind),
+      service.id,
+    );
+    if (raw is! Map) return const {};
+    const safeKeys = {
+      'name',
+      'databaseName',
+      'databaseUser',
+      'databaseType',
+      'dockerImage',
+      'image',
+      'internalPort',
+      'externalPort',
+      'appName',
+    };
+    return {
+      for (final entry in raw.entries)
+        if (safeKeys.contains('${entry.key}')) '${entry.key}': entry.value,
+    };
+  }
+
+  bool _isDatabase(ServiceKind kind) => switch (kind) {
+        ServiceKind.postgres ||
+        ServiceKind.mysql ||
+        ServiceKind.mariadb ||
+        ServiceKind.mongo ||
+        ServiceKind.redis =>
+          true,
+        _ => false,
+      };
+
   Future<ServiceModel> _applicationWithMonitoring(ServiceModel service) async {
     try {
       final raw = await api.applicationMonitoring(service.appName);
@@ -816,11 +873,19 @@ class RealDokployRepository implements DokployRepository {
   }
 
   @override
-  Future<List<String>> logs(String serviceId, {int tail = 200}) async {
+  Future<List<String>> logs(ServiceModel service, {int tail = 200}) async {
     if (!(await capabilities()).logs) {
-      throw _unsupported('application.readLogs');
+      throw _unsupported('${_resourceName(service.kind)}.readLogs');
     }
-    final data = await api.applicationLogs(serviceId, tail: tail);
+    final data = service.kind == ServiceKind.application ||
+            service.kind == ServiceKind.compose
+        ? await api.applicationLogs(service.id, tail: tail)
+        : await api.databaseLogs(
+            _resourceName(service.kind),
+            _idKey(service.kind),
+            service.id,
+            tail: tail,
+          );
     if (data is String) return data.split('\n');
     if (data is List) return data.map((e) => '$e').toList();
     if (data is Map) {
@@ -933,21 +998,19 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<void> start(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('start');
-    return s.kind == ServiceKind.compose
-        ? api.startCompose(s.id)
-        : s.kind == ServiceKind.postgres
-            ? api.startPostgres(s.id)
-            : api.startApplication(s.id);
+    if (s.kind == ServiceKind.compose) return api.startCompose(s.id);
+    if (s.kind == ServiceKind.application) return api.startApplication(s.id);
+    return api.databaseAction(
+        _resourceName(s.kind), 'start', _idKey(s.kind), s.id);
   }
 
   @override
   Future<void> stop(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('stop');
-    return s.kind == ServiceKind.compose
-        ? api.stopCompose(s.id)
-        : s.kind == ServiceKind.postgres
-            ? api.stopPostgres(s.id)
-            : api.stopApplication(s.id);
+    if (s.kind == ServiceKind.compose) return api.stopCompose(s.id);
+    if (s.kind == ServiceKind.application) return api.stopApplication(s.id);
+    return api.databaseAction(
+        _resourceName(s.kind), 'stop', _idKey(s.kind), s.id);
   }
 
   @override
@@ -959,11 +1022,10 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<void> redeploy(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('redeploy');
-    return s.kind == ServiceKind.compose
-        ? api.deployCompose(s.id)
-        : s.kind == ServiceKind.postgres
-            ? api.deployPostgres(s.id)
-            : api.redeployApplication(s.id);
+    if (s.kind == ServiceKind.compose) return api.deployCompose(s.id);
+    if (s.kind == ServiceKind.application) return api.redeployApplication(s.id);
+    return api.databaseAction(
+        _resourceName(s.kind), 'deploy', _idKey(s.kind), s.id);
   }
 
   @override

@@ -18,7 +18,9 @@ Compose service details, databases, backup/restore, scheduled jobs, domains, met
 
 ## Phase 3: mobile-native
 
-Push, biometrics, terminal, widgets, Siri/Android actions, offline cache, Git context, “backup then redeploy.”
+Biometrics and cached Android/iOS home-screen health widgets are implemented.
+Push, terminal, shortcut actions, offline cache, Git context, and “backup then
+redeploy” remain planned.
 
 ## Phase 4: ecosystem quality
 

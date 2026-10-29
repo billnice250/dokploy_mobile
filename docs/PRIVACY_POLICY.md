@@ -1,6 +1,6 @@
 # DployGo Privacy Policy
 
-**Last updated:** August 16, 2026
+**Last updated:** October 29, 2026
 
 DployGo is an unofficial mobile client for connecting to Dokploy instances that
 you or your organization configure. This Privacy Policy explains how DployGo
@@ -72,6 +72,14 @@ You can disable notification permission or hide notification previews in your
 operating system settings. The current version uses local notifications and
 does not send this information through a DployGo-operated push-notification
 relay.
+
+### Home-screen widget
+
+If you add the DployGo status widget, the app shares the active instance's
+display name and aggregate running, stopped, and failed service counts with the
+widget through the operating system's local app storage. The widget does not
+receive API keys, server URLs, or raw service data. Its summary updates when
+DployGo loads dashboard data; it does not connect to Dokploy on its own.
 
 ### Biometric confirmation
 

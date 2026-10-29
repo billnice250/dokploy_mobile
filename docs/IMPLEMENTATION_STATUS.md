@@ -31,16 +31,20 @@ These paths use the real `DokployApi` through `RealDokployRepository`; widgets d
 - Rich dashboard health and attention data.
 - Server CPU, memory, and disk percentages.
 - Backup center data.
-- Database summary data.
 - Detailed service CPU, memory, and network values.
 
-The real repository returns empty backup, schedule, and domain collections until their current response contracts have fixture coverage.
+The real repository still returns an empty backup collection pending
+response fixtures. Schedule and domain reads are implemented below.
 
 ## Partial
 
 - Project hierarchy: projects and services work, but environments are not yet first-class domain objects or navigation levels.
 - Compose: stack lifecycle and rendered Compose preview work. Per-service
   status, metrics, and logs are not mapped.
+- Databases: PostgreSQL, MySQL, MariaDB, MongoDB, and Redis appear in a
+  dedicated list. Nonsecret settings, logs, and start/stop/deploy operations
+  are mapped. Backup/restore, database shell, password management, and create
+  or delete flows are not implemented.
 - Deployments: centralized history, timestamps, duration, failure context, and
   deployment-log navigation are mapped defensively. Active logs support
   pause/resume polling, search, bounded tail selection, and copy. Distinct build
@@ -64,21 +68,26 @@ The real repository returns empty backup, schedule, and domain collections until
   `schedule.list`, `domain.byApplicationId`, and `domain.byComposeId` calls.
   Writes, run history, and domain editing remain unavailable pending fixtures
   from supported Dokploy versions.
+- Home-screen widget: Android and iOS widgets show the active instance name and
+  running/stopped/failed counts from the latest dashboard load. The widget
+  receives no credentials and does not make server requests; app-group signing
+  must be enabled for iOS distribution.
 
 ## Planned / unavailable
 
-- Real backups and full database management.
+- Real backups and full database management, including create/delete,
+  password management, and restore workflows.
 - Schedule creation/editing/run history and domain creation/editing.
 - Compose service inspection and terminal sessions.
 - Biometrics, app lock, screenshot protection, and clipboard auto-clear.
-- Push relay image, home-screen widgets, shortcuts, and Git enrichment.
+- Shortcut actions, push relay image, and Git enrichment.
 - Compatibility CI against disposable Dokploy versions.
 - Aggregated All Instances dashboard.
 
 ## Current verification
 
 - `dart format`: enforced on `lib/` and `test/`.
-- `flutter analyze`: clean.
+- `flutter analyze`: clean for the last audited change set.
 - `flutter test`: unit and widget coverage includes demo startup, transport
   failure mapping, deployment transition alerts, and overnight quiet hours.
 - Android debug APK and iOS simulator builds pass with the notification plugin.

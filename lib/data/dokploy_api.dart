@@ -361,6 +361,22 @@ class DokployApi {
   Future<void> deployPostgres(String id) async =>
       post('postgres.deploy', {'postgresId': id});
 
+  Future<dynamic> databaseLogs(
+    String resource,
+    String idKey,
+    String id, {
+    int tail = 200,
+  }) =>
+      get('$resource.readLogs', {idKey: id, 'tail': tail.clamp(1, 10000)});
+
+  Future<void> databaseAction(
+    String resource,
+    String action,
+    String idKey,
+    String id,
+  ) async =>
+      post('$resource.$action', {idKey: id});
+
   Map<String, String> get _authenticationHeaders => {
         if (_sendApiKey && _apiKey.isNotEmpty) 'x-api-key': _apiKey,
       };
