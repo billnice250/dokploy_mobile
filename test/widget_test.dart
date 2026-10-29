@@ -500,6 +500,11 @@ void main() {
     expect(find.text('production'), findsOneWidget);
     expect(find.text('Unsaved environment changes'), findsNothing);
 
+    await tester.scrollUntilVisible(
+      find.text('Add variable'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Add variable'));
     await tester.pump();
 
@@ -510,7 +515,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Every variable needs a key.'),
       120,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Every variable needs a key.'), findsOneWidget);
   });
