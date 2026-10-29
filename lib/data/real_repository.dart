@@ -38,11 +38,11 @@ class RealDokployRepository implements DokployRepository {
         compose: serviceRead,
         metrics: allowed('monitoring', 'read'),
         servers: allowed('server', 'read'),
-        // These adapters are not implemented yet. A server permission alone
-        // must not make an unfinished control appear active.
+        // Backups still require response fixtures. Schedule and domain reads
+        // are implemented through their documented list procedures.
         backups: false,
-        schedules: false,
-        domains: false,
+        schedules: serviceRead,
+        domains: serviceRead,
         databases: serviceRead,
         traefikRequests: serviceRead,
       );
@@ -61,7 +61,9 @@ class RealDokployRepository implements DokployRepository {
         'items',
         'projects',
         'deployments',
-        'servers'
+        'servers',
+        'schedules',
+        'domains',
       ]) {
         final value = data[key];
         if (value is List) return value;
@@ -632,6 +634,81 @@ class RealDokployRepository implements DokployRepository {
     }
   }
 
+  @override
+  Future<String> composePreview(ServiceModel service) async {
+    if (service.kind != ServiceKind.compose) {
+      throw ArgumentError.value(
+          service.kind, 'service.kind', 'Must be Compose');
+    }
+    final raw = await api.convertedCompose(service.id);
+    if (raw is String) return raw;
+    if (raw is Map) {
+      for (final key in ['composeFile', 'compose', 'yaml', 'content']) {
+        final value = raw[key];
+        if (value is String) return value;
+      }
+      return const JsonEncoder.withIndent('  ').convert(raw);
+    }
+    return '$raw';
+  }
+
+  @override
+  Future<Map<String, dynamic>> networkSettings(ServiceModel service) async {
+    final raw = await api.serviceConfiguration(
+      _resourceName(service.kind),
+      _idKey(service.kind),
+      service.id,
+    );
+    if (raw is! Map) return const {};
+    final settings = <String, dynamic>{};
+    for (final entry in raw.entries) {
+      final key = '${entry.key}';
+      final normalized = key.toLowerCase();
+      if (normalized.contains('network') ||
+          const {'ipam', 'ipv4address', 'ipv6address', 'attachable'}
+              .contains(normalized)) {
+        settings[key] = entry.value;
+      }
+    }
+    return settings;
+  }
+
+  @override
+  Future<Map<String, dynamic>> databaseSettings(ServiceModel service) async {
+    if (!_isDatabase(service.kind)) return const {};
+    final raw = await api.serviceConfiguration(
+      _resourceName(service.kind),
+      _idKey(service.kind),
+      service.id,
+    );
+    if (raw is! Map) return const {};
+    const safeKeys = {
+      'name',
+      'databaseName',
+      'databaseUser',
+      'databaseType',
+      'dockerImage',
+      'image',
+      'internalPort',
+      'externalPort',
+      'appName',
+    };
+    return {
+      for (final entry in raw.entries)
+        if (safeKeys.contains('${entry.key}')) '${entry.key}': entry.value,
+    };
+  }
+
+  bool _isDatabase(ServiceKind kind) => switch (kind) {
+        ServiceKind.postgres ||
+        ServiceKind.mysql ||
+        ServiceKind.mariadb ||
+        ServiceKind.mongo ||
+        ServiceKind.redis =>
+          true,
+        _ => false,
+      };
+
   Future<ServiceModel> _applicationWithMonitoring(ServiceModel service) async {
     try {
       final raw = await api.applicationMonitoring(service.appName);
@@ -796,11 +873,19 @@ class RealDokployRepository implements DokployRepository {
   }
 
   @override
-  Future<List<String>> logs(String serviceId, {int tail = 200}) async {
+  Future<List<String>> logs(ServiceModel service, {int tail = 200}) async {
     if (!(await capabilities()).logs) {
-      throw _unsupported('application.readLogs');
+      throw _unsupported('${_resourceName(service.kind)}.readLogs');
     }
-    final data = await api.applicationLogs(serviceId, tail: tail);
+    final data = service.kind == ServiceKind.application ||
+            service.kind == ServiceKind.compose
+        ? await api.applicationLogs(service.id, tail: tail)
+        : await api.databaseLogs(
+            _resourceName(service.kind),
+            _idKey(service.kind),
+            service.id,
+            tail: tail,
+          );
     if (data is String) return data.split('\n');
     if (data is List) return data.map((e) => '$e').toList();
     if (data is Map) {
@@ -913,21 +998,19 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<void> start(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('start');
-    return s.kind == ServiceKind.compose
-        ? api.startCompose(s.id)
-        : s.kind == ServiceKind.postgres
-            ? api.startPostgres(s.id)
-            : api.startApplication(s.id);
+    if (s.kind == ServiceKind.compose) return api.startCompose(s.id);
+    if (s.kind == ServiceKind.application) return api.startApplication(s.id);
+    return api.databaseAction(
+        _resourceName(s.kind), 'start', _idKey(s.kind), s.id);
   }
 
   @override
   Future<void> stop(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('stop');
-    return s.kind == ServiceKind.compose
-        ? api.stopCompose(s.id)
-        : s.kind == ServiceKind.postgres
-            ? api.stopPostgres(s.id)
-            : api.stopApplication(s.id);
+    if (s.kind == ServiceKind.compose) return api.stopCompose(s.id);
+    if (s.kind == ServiceKind.application) return api.stopApplication(s.id);
+    return api.databaseAction(
+        _resourceName(s.kind), 'stop', _idKey(s.kind), s.id);
   }
 
   @override
@@ -939,11 +1022,10 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<void> redeploy(ServiceModel s) async {
     if (!(await capabilities()).lifecycle) throw _unsupported('redeploy');
-    return s.kind == ServiceKind.compose
-        ? api.deployCompose(s.id)
-        : s.kind == ServiceKind.postgres
-            ? api.deployPostgres(s.id)
-            : api.redeployApplication(s.id);
+    if (s.kind == ServiceKind.compose) return api.deployCompose(s.id);
+    if (s.kind == ServiceKind.application) return api.redeployApplication(s.id);
+    return api.databaseAction(
+        _resourceName(s.kind), 'deploy', _idKey(s.kind), s.id);
   }
 
   @override
@@ -1002,9 +1084,89 @@ class RealDokployRepository implements DokployRepository {
   @override
   Future<List<BackupModel>> backups() async => const [];
   @override
-  Future<List<ScheduleModel>> schedules() async => const [];
+  Future<List<ScheduleModel>> schedules() async {
+    if (!(await capabilities()).schedules) return const [];
+    final projects = _list(await _projectHierarchy()).whereType<Map>();
+    final targets = <({String id, String type})>[];
+    for (final project in projects) {
+      for (final environment in _listAt(project, 'environments')) {
+        for (final app in _listAt(environment, 'applications')) {
+          final id = _s(app, ['applicationId', 'id']);
+          if (id.isNotEmpty) targets.add((id: id, type: 'application'));
+        }
+        for (final compose in _listAt(environment, 'compose')) {
+          final id = _s(compose, ['composeId', 'id']);
+          if (id.isNotEmpty) targets.add((id: id, type: 'compose'));
+        }
+      }
+    }
+    try {
+      final servers = _list(await api.servers()).whereType<Map>();
+      for (final server in servers) {
+        final id = _s(server, ['serverId', 'id']);
+        if (id.isNotEmpty) targets.add((id: id, type: 'server'));
+      }
+    } on DokployFailure {
+      // Server schedules are optional for tokens without server access.
+    }
+    targets.add((id: '', type: 'dokploy-server'));
+    final results = await Future.wait(targets.map((target) async {
+      try {
+        return _list(await api.schedules(target.id, target.type));
+      } on DokployFailure {
+        return const <dynamic>[];
+      }
+    }));
+    final unique = <String, ScheduleModel>{};
+    for (final item in results.expand((items) => items).whereType<Map>()) {
+      final id = _s(item, ['scheduleId', 'id']);
+      if (id.isEmpty) continue;
+      final lastRun = DateTime.tryParse(_s(item, ['lastRun', 'lastRunAt']));
+      final nextRun = DateTime.tryParse(_s(item, ['nextRun', 'nextRunAt']));
+      unique[id] = ScheduleModel(
+        id: id,
+        name: _s(item, ['name'], 'Scheduled job'),
+        cron: _s(item, ['cronExpression', 'schedule']),
+        lastStatus: _state(_s(item, ['lastStatus', 'status'])),
+        lastRun: lastRun,
+        nextRun: nextRun,
+      );
+    }
+    return unique.values.toList();
+  }
+
   @override
-  Future<List<DomainModel>> domains() async => const [];
+  Future<List<DomainModel>> domains() async {
+    if (!(await capabilities()).domains) return const [];
+    final services = await _loadBaseServices();
+    final targets = services.where((service) =>
+        service.kind == ServiceKind.application ||
+        service.kind == ServiceKind.compose);
+    final results = await Future.wait(targets.map((service) async {
+      try {
+        return _list(service.kind == ServiceKind.compose
+            ? await api.domainsByCompose(service.id)
+            : await api.domainsByApplication(service.id));
+      } on DokployFailure {
+        return const <dynamic>[];
+      }
+    }));
+    final unique = <String, DomainModel>{};
+    for (final item in results.expand((items) => items).whereType<Map>()) {
+      final id = _s(item, ['domainId', 'id']);
+      final host = _s(item, ['host', 'domain']);
+      if (id.isEmpty || host.isEmpty) continue;
+      unique[id] = DomainModel(
+        id: id,
+        host: host,
+        target:
+            _s(item, ['serviceName', 'appName', 'applicationName'], 'Service'),
+        https: item['https'] == true,
+        port: _d(item['port']).round(),
+      );
+    }
+    return unique.values.toList();
+  }
 
   @override
   Future<TraefikRequestPage> traefikRequests({int limit = 200}) async {

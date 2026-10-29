@@ -11,6 +11,8 @@ import '../screens/deployment_detail.dart';
 import '../screens/notifications.dart';
 import '../screens/notification_settings.dart';
 import '../screens/traefik_requests.dart';
+import '../screens/databases.dart';
+import '../screens/widgets_screen.dart';
 
 // Let Flutter's platform route select the initial page. Normal launches still
 // start at `/`, while deep links and store-screenshot captures can open a
@@ -49,6 +51,8 @@ final router = GoRouter(routes: [
             deploymentId: s.pathParameters['id']!,
           )),
   GoRoute(path: '/operations', builder: (c, s) => const OperationsScreen()),
+  GoRoute(path: '/databases', builder: (c, s) => const DatabasesScreen()),
+  GoRoute(path: '/widgets', builder: (c, s) => const WidgetsScreen()),
   GoRoute(
       path: '/traefik-requests',
       builder: (c, s) => const TraefikRequestsScreen()),

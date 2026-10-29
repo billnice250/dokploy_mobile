@@ -9,7 +9,8 @@ class OperationsScreen extends ConsumerWidget {
   const OperationsScreen({super.key});
   @override
   Widget build(BuildContext c, WidgetRef ref) {
-    final demo = ref.watch(currentInstanceProvider).demo;
+    ref.watch(currentInstanceProvider);
+    final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     return Scaffold(
         appBar: AppBar(title: const Text('Operations')),
         body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -19,20 +20,26 @@ class OperationsScreen extends ConsumerWidget {
               Icons.backup_outlined,
               'Backups',
               'Database, volume and control-plane backups',
-              demo ? () => _showBackups(c, ref) : null,
-              upcoming: !demo),
+              capabilities?.backups == true ? () => _showBackups(c, ref) : null,
+              upcoming: capabilities?.backups != true),
           _nav(
               Icons.schedule,
               'Scheduled jobs',
               'Cron jobs, run history and logs',
-              demo ? () => _showSchedules(c, ref) : null,
-              upcoming: !demo),
+              capabilities?.schedules == true
+                  ? () => _showSchedules(c, ref)
+                  : null,
+              upcoming: capabilities?.schedules != true),
           _nav(Icons.language, 'Domains', 'Routes, HTTPS and target ports',
-              demo ? () => _showDomains(c, ref) : null,
-              upcoming: !demo),
-          _nav(Icons.storage, 'Databases',
-              'Postgres, MySQL, MariaDB, Mongo and Redis lifecycle', null,
-              upcoming: true),
+              capabilities?.domains == true ? () => _showDomains(c, ref) : null,
+              upcoming: capabilities?.domains != true),
+          _nav(
+            Icons.storage,
+            'Databases',
+            'PostgreSQL, MySQL, MariaDB, MongoDB and Redis',
+            capabilities?.databases == true ? () => c.push('/databases') : null,
+            upcoming: capabilities?.databases != true,
+          ),
           _nav(
               Icons.swap_vert_rounded,
               'Traefik requests',
@@ -47,9 +54,11 @@ class OperationsScreen extends ConsumerWidget {
               'Notifications',
               'Deployment changes and local notification history',
               () => c.push('/notifications')),
-          _nav(Icons.widgets_outlined, 'Widgets & shortcuts',
-              'Home-screen health and quick actions', null,
-              upcoming: true),
+          _nav(
+              Icons.widgets_outlined,
+              'Home-screen widget',
+              'Infrastructure health on your home screen',
+              () => c.push('/widgets')),
         ]));
   }
 
@@ -85,53 +94,71 @@ class OperationsScreen extends ConsumerWidget {
                       ? const UpcomingBadge()
                       : const Icon(Icons.chevron_right))));
   void _showBackups(BuildContext c, WidgetRef ref) {
-    final x = ref.read(backupsProvider);
-    _sheet(
-        c,
-        'Backups',
-        x.valueOrNull
-                ?.map((b) => ListTile(
-                    leading: StatusDot(b.status),
-                    title: Text(b.name),
-                    subtitle:
-                        Text('${b.target} • ${b.sizeMb.toStringAsFixed(0)} MB'),
-                    trailing: IconButton(
-                        onPressed: () {}, icon: const Icon(Icons.play_arrow))))
-                .toList() ??
-            []);
+    _sheet(c, 'Backups', Consumer(builder: (context, ref, _) {
+      final state = ref.watch(backupsProvider);
+      return state.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) =>
+            Center(child: Text('Could not load backups: $error')),
+        data: (backups) => backups.isEmpty
+            ? const Center(child: Text('No backups found.'))
+            : ListView(
+                children: backups
+                    .map((backup) => ListTile(
+                          leading: StatusDot(backup.status),
+                          title: Text(backup.name),
+                          subtitle: Text(
+                              '${backup.target} • ${backup.sizeMb.toStringAsFixed(0)} MB'),
+                        ))
+                    .toList()),
+      );
+    }));
   }
 
   void _showSchedules(BuildContext c, WidgetRef ref) {
-    final x = ref.read(schedulesProvider);
-    _sheet(
-        c,
-        'Scheduled jobs',
-        x.valueOrNull
-                ?.map((j) => ListTile(
-                    leading: StatusDot(j.lastStatus),
-                    title: Text(j.name),
-                    subtitle: Text(j.cron),
-                    trailing: IconButton(
-                        onPressed: () {}, icon: const Icon(Icons.play_arrow))))
-                .toList() ??
-            []);
+    _sheet(c, 'Scheduled jobs', Consumer(builder: (context, ref, _) {
+      final state = ref.watch(schedulesProvider);
+      return state.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) =>
+            Center(child: Text('Could not load schedules: $error')),
+        data: (jobs) => jobs.isEmpty
+            ? const Center(child: Text('No scheduled jobs found.'))
+            : ListView(
+                children: jobs
+                    .map((job) => ListTile(
+                          leading: StatusDot(job.lastStatus),
+                          title: Text(job.name),
+                          subtitle: Text(job.cron),
+                        ))
+                    .toList()),
+      );
+    }));
   }
 
   void _showDomains(BuildContext c, WidgetRef ref) {
-    final x = ref.read(domainsProvider);
-    _sheet(
-        c,
-        'Domains',
-        x.valueOrNull
-                ?.map((d) => ListTile(
-                    leading: Icon(d.https ? Icons.lock : Icons.language),
-                    title: Text(d.host),
-                    subtitle: Text('${d.target} • :${d.port}')))
-                .toList() ??
-            []);
+    _sheet(c, 'Domains', Consumer(builder: (context, ref, _) {
+      final state = ref.watch(domainsProvider);
+      return state.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) =>
+            Center(child: Text('Could not load domains: $error')),
+        data: (domains) => domains.isEmpty
+            ? const Center(child: Text('No domains found.'))
+            : ListView(
+                children: domains
+                    .map((domain) => ListTile(
+                          leading:
+                              Icon(domain.https ? Icons.lock : Icons.language),
+                          title: Text(domain.host),
+                          subtitle: Text('${domain.target} • :${domain.port}'),
+                        ))
+                    .toList()),
+      );
+    }));
   }
 
-  void _sheet(BuildContext c, String title, List<Widget> items) {
+  void _sheet(BuildContext c, String title, Widget body) {
     showModalBottomSheet(
         context: c,
         isScrollControlled: true,
@@ -141,7 +168,7 @@ class OperationsScreen extends ConsumerWidget {
             child: Scaffold(
                 appBar: AppBar(
                     title: Text(title), automaticallyImplyLeading: false),
-                body: ListView(
-                    padding: const EdgeInsets.all(12), children: items))));
+                body:
+                    Padding(padding: const EdgeInsets.all(12), child: body))));
   }
 }

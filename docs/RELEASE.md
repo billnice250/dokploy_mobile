@@ -151,6 +151,9 @@ GitHub Actions workflow yet. To prepare a future TestFlight upload:
 1. Register `it.billnice.apps.dokploy` in the Apple Developer portal.
 2. Create the **DployGo** record in App Store Connect.
 3. Create an App Store distribution certificate and provisioning profile.
+   Enable the `group.it.billnice.apps.dokploy` App Group for the app and
+   `it.billnice.apps.dokploy.widget` extension identifiers, and include it in
+   both profiles so the status widget can read its local summary.
 4. Create an App Store Connect API key that can upload builds.
 5. Provide these values to the release environment:
 

@@ -148,6 +148,8 @@ class DokployApi {
       post('$resource.saveEnvironment', payload);
 
   Future<dynamic> compose(String id) => get('compose.one', {'composeId': id});
+  Future<dynamic> convertedCompose(String id) =>
+      get('compose.getConvertedCompose', {'composeId': id});
   Future<dynamic> composeServices(String id) =>
       get('compose.loadServices', {'composeId': id});
   Future<void> deployCompose(String id) async =>
@@ -169,6 +171,16 @@ class DokployApi {
       );
   Future<void> cancelDeployment(String id) async =>
       post('deployment.killProcess', {'deploymentId': id});
+
+  Future<dynamic> schedules(String id, String scheduleType) => get(
+        'schedule.list',
+        {'id': id, 'scheduleType': scheduleType},
+      );
+
+  Future<dynamic> domainsByApplication(String id) =>
+      get('domain.byApplicationId', {'applicationId': id});
+  Future<dynamic> domainsByCompose(String id) =>
+      get('domain.byComposeId', {'composeId': id});
 
   Future<dynamic> servers() => get('server.all');
   Future<dynamic> serverHealth({String? serverId}) => get(
@@ -348,6 +360,22 @@ class DokployApi {
       post('postgres.stop', {'postgresId': id});
   Future<void> deployPostgres(String id) async =>
       post('postgres.deploy', {'postgresId': id});
+
+  Future<dynamic> databaseLogs(
+    String resource,
+    String idKey,
+    String id, {
+    int tail = 200,
+  }) =>
+      get('$resource.readLogs', {idKey: id, 'tail': tail.clamp(1, 10000)});
+
+  Future<void> databaseAction(
+    String resource,
+    String action,
+    String idKey,
+    String id,
+  ) async =>
+      post('$resource.$action', {idKey: id});
 
   Map<String, String> get _authenticationHeaders => {
         if (_sendApiKey && _apiKey.isNotEmpty) 'x-api-key': _apiKey,

@@ -116,6 +116,48 @@ class MockDokployRepository implements DokployRepository {
   @override
   Future<ServiceModel> serviceDetails(ServiceModel service) async => service;
   @override
+  Future<String> composePreview(ServiceModel service) async {
+    final appName = service.appName.isEmpty ? 'demo-compose' : service.appName;
+    final host = service.domain.isEmpty ? 'media.example.com' : service.domain;
+    return '''# Illustrative demo preview; this is not a live Dokploy response.
+services:
+  $appName:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.$appName.rule=Host(`$host`)"
+''';
+  }
+
+  @override
+  Future<Map<String, dynamic>> networkSettings(ServiceModel service) async => {
+        'networkMode': 'bridge',
+        'networks': [
+          {
+            'name': 'dokploy-network',
+            'driver': 'overlay',
+            'scope': 'swarm',
+          },
+        ],
+      };
+  @override
+  Future<Map<String, dynamic>> databaseSettings(ServiceModel service) async => {
+        'databaseName': 'app_data',
+        'databaseUser': 'app_user',
+        'dockerImage': service.image,
+        'internalPort': switch (service.kind) {
+          ServiceKind.postgres => 5432,
+          ServiceKind.mysql || ServiceKind.mariadb => 3306,
+          ServiceKind.mongo => 27017,
+          ServiceKind.redis => 6379,
+          _ => 0,
+        },
+      };
+
+  @override
   Future<List<DeploymentModel>> deployments() async => [
         DeploymentModel(
             id: 'd1',
@@ -254,12 +296,11 @@ class MockDokployRepository implements DokployRepository {
             port: 8080),
       ];
   @override
-  Future<
-      List<
-          String>> logs(String serviceId, {int tail = 200}) async => List.generate(
-      80,
-      (i) =>
-          '${now.subtract(Duration(seconds: 80 - i)).toIso8601String()}  ${i % 11 == 0 ? 'WARN' : 'INFO'}  ${i % 7 == 0 ? 'GET /api/health 200' : 'Application heartbeat ok'}');
+  Future<List<String>> logs(ServiceModel service, {int tail = 200}) async =>
+      List.generate(
+          80,
+          (i) =>
+              '${now.subtract(Duration(seconds: 80 - i)).toIso8601String()}  ${i % 11 == 0 ? 'WARN' : 'INFO'}  ${service.name}: ${i % 7 == 0 ? 'GET /api/health 200' : 'Application heartbeat ok'}');
   @override
   Future<List<ContainerInstance>> containers(ServiceModel service) async =>
       const [

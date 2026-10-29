@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/providers.dart';
+import '../core/home_widget_bridge.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
@@ -13,10 +16,20 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final instance = ref.watch(currentInstanceProvider);
+    ref.listen(dashboardProvider, (previous, next) {
+      next.whenData((snapshot) {
+        unawaited(HomeWidgetBridge.update(
+          instanceName: instance.name,
+          running: snapshot.running,
+          stopped: snapshot.stopped,
+          failed: snapshot.failed,
+        ));
+      });
+    });
     final dashboard = ref.watch(dashboardProvider);
     final servers = ref.watch(serversProvider);
     final liveServer = ref.watch(liveControlPlaneMetricsProvider).valueOrNull;
-    final instance = ref.watch(currentInstanceProvider);
     final capabilities = ref.watch(capabilitiesProvider).valueOrNull;
     final notifications =
         ref.watch(notificationHistoryProvider(instance.id)).valueOrNull;

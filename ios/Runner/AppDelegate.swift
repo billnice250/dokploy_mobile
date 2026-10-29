@@ -3,6 +3,7 @@ import CryptoKit
 import Security
 import UIKit
 import UserNotifications
+import WidgetKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -56,6 +57,25 @@ import UserNotifications
       let der = SecCertificateCopyData(certificate) as Data
       let digest = Insecure.SHA1.hash(data: der)
       result(digest.map { String(format: "%02X", $0) }.joined(separator: ":"))
+    }
+    let widgetChannel = FlutterMethodChannel(
+      name: "dploygo/home_widget",
+      binaryMessenger: registrar.messenger()
+    )
+    widgetChannel.setMethodCallHandler { call, result in
+      guard call.method == "updateSummary",
+            let values = call.arguments as? [String: Any],
+            let defaults = UserDefaults(suiteName: "group.it.billnice.apps.dokploy") else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      for key in ["instanceName", "running", "stopped", "failed", "updatedAt"] {
+        defaults.set(values[key], forKey: key)
+      }
+      if #available(iOS 14.0, *) {
+        WidgetCenter.shared.reloadAllTimelines()
+      }
+      result(true)
     }
   }
 }

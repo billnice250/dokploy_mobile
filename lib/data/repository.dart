@@ -6,6 +6,9 @@ abstract interface class DokployRepository {
   Future<List<ProjectModel>> projects();
   Future<List<ServiceModel>> services();
   Future<ServiceModel> serviceDetails(ServiceModel service);
+  Future<Map<String, dynamic>> networkSettings(ServiceModel service);
+  Future<Map<String, dynamic>> databaseSettings(ServiceModel service);
+  Future<String> composePreview(ServiceModel service);
   Future<List<DeploymentModel>> deployments();
   Future<List<ServerModel>> servers();
   Future<List<BackupModel>> backups();
@@ -20,7 +23,7 @@ abstract interface class DokployRepository {
     ContainerInstance container, {
     int tail = 200,
   });
-  Future<List<String>> logs(String serviceId, {int tail = 200});
+  Future<List<String>> logs(ServiceModel service, {int tail = 200});
   Future<List<String>> deploymentLogs(String deploymentId, {int tail = 500});
   Future<void> start(ServiceModel service);
   Future<void> stop(ServiceModel service);
