@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last audited: 15 August 2026.
+Last audited: 29 October 2026.
 
 This document describes the code that exists today. It deliberately does not count a screen placeholder as a working feature.
 
@@ -31,8 +31,6 @@ These paths use the real `DokployApi` through `RealDokployRepository`; widgets d
 - Rich dashboard health and attention data.
 - Server CPU, memory, and disk percentages.
 - Backup center data.
-- Scheduled-job data.
-- Domain data.
 - Database summary data.
 - Detailed service CPU, memory, and network values.
 
@@ -41,7 +39,8 @@ The real repository returns empty backup, schedule, and domain collections until
 ## Partial
 
 - Project hierarchy: projects and services work, but environments are not yet first-class domain objects or navigation levels.
-- Compose: stack lifecycle exists, but per-service status, metrics, and logs are not mapped.
+- Compose: stack lifecycle and rendered Compose preview work. Per-service
+  status, metrics, and logs are not mapped.
 - Deployments: centralized history, timestamps, duration, failure context, and
   deployment-log navigation are mapped defensively. Active logs support
   pause/resume polling, search, bounded tail selection, and copy. Distinct build
@@ -61,10 +60,15 @@ The real repository returns empty backup, schedule, and domain collections until
 - Notifications: foreground polling and local alerts work. Reliable background
   delivery is modeled in preferences but remains unpaired until the optional
   webhook-to-APNs/FCM relay is packaged.
+- Schedules and domains: read-only lists use Dokploy's documented
+  `schedule.list`, `domain.byApplicationId`, and `domain.byComposeId` calls.
+  Writes, run history, and domain editing remain unavailable pending fixtures
+  from supported Dokploy versions.
 
 ## Planned / unavailable
 
-- Real backups, schedules, domains, and full database management.
+- Real backups and full database management.
+- Schedule creation/editing/run history and domain creation/editing.
 - Compose service inspection and terminal sessions.
 - Biometrics, app lock, screenshot protection, and clipboard auto-clear.
 - Push relay image, home-screen widgets, shortcuts, and Git enrichment.

@@ -6,6 +6,7 @@ abstract interface class DokployRepository {
   Future<List<ProjectModel>> projects();
   Future<List<ServiceModel>> services();
   Future<ServiceModel> serviceDetails(ServiceModel service);
+  Future<String> composePreview(ServiceModel service);
   Future<List<DeploymentModel>> deployments();
   Future<List<ServerModel>> servers();
   Future<List<BackupModel>> backups();

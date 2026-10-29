@@ -148,6 +148,8 @@ class DokployApi {
       post('$resource.saveEnvironment', payload);
 
   Future<dynamic> compose(String id) => get('compose.one', {'composeId': id});
+  Future<dynamic> convertedCompose(String id) =>
+      get('compose.getConvertedCompose', {'composeId': id});
   Future<dynamic> composeServices(String id) =>
       get('compose.loadServices', {'composeId': id});
   Future<void> deployCompose(String id) async =>
@@ -169,6 +171,16 @@ class DokployApi {
       );
   Future<void> cancelDeployment(String id) async =>
       post('deployment.killProcess', {'deploymentId': id});
+
+  Future<dynamic> schedules(String id, String scheduleType) => get(
+        'schedule.list',
+        {'id': id, 'scheduleType': scheduleType},
+      );
+
+  Future<dynamic> domainsByApplication(String id) =>
+      get('domain.byApplicationId', {'applicationId': id});
+  Future<dynamic> domainsByCompose(String id) =>
+      get('domain.byComposeId', {'composeId': id});
 
   Future<dynamic> servers() => get('server.all');
   Future<dynamic> serverHealth({String? serverId}) => get(

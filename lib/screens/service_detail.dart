@@ -11,6 +11,7 @@ import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
+import 'compose_preview.dart';
 
 class ServiceDetailScreen extends ConsumerStatefulWidget {
   const ServiceDetailScreen({super.key, required this.serviceId});
@@ -239,6 +240,19 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                 _confirmStop(context, service);
               },
             ),
+            ListTile(
+              enabled: service.kind == ServiceKind.compose,
+              leading: const Icon(Icons.preview_outlined),
+              title: const Text('Preview Compose'),
+              subtitle:
+                  const Text('Inspect the rendered Compose configuration'),
+              onTap: service.kind == ServiceKind.compose
+                  ? () {
+                      Navigator.pop(sheetContext);
+                      _showComposePreview(context, service);
+                    }
+                  : null,
+            ),
             const Divider(),
             const ListTile(
               enabled: false,
@@ -252,6 +266,30 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showComposePreview(
+    BuildContext context,
+    ServiceModel service,
+  ) async {
+    try {
+      final isDemo = ref.read(currentInstanceProvider).demo;
+      final content =
+          await ref.read(repositoryProvider).composePreview(service);
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ComposePreviewDialog(content: content, isDemo: isDemo),
+      );
+    } catch (error) {
+      if (context.mounted) {
+        DployGoNotice.show(
+          context,
+          message: 'Could not preview Compose: $error',
+          tone: DployGoNoticeTone.error,
+        );
+      }
+    }
   }
 
   bool _supportsLifecycle(ServiceKind kind) =>

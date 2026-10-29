@@ -116,6 +116,23 @@ class MockDokployRepository implements DokployRepository {
   @override
   Future<ServiceModel> serviceDetails(ServiceModel service) async => service;
   @override
+  Future<String> composePreview(ServiceModel service) async {
+    final appName = service.appName.isEmpty ? 'demo-compose' : service.appName;
+    final host = service.domain.isEmpty ? 'media.example.com' : service.domain;
+    return '''# Illustrative demo preview; this is not a live Dokploy response.
+services:
+  $appName:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.$appName.rule=Host(`$host`)"
+''';
+  }
+
+  @override
   Future<List<DeploymentModel>> deployments() async => [
         DeploymentModel(
             id: 'd1',

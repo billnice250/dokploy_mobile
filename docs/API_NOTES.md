@@ -2,7 +2,8 @@
 
 The current public API documentation uses `x-api-key` authorization and procedure-style endpoints under `/api`.
 
-Representative verified procedures (August 2026):
+Representative verified procedures (reviewed against the public API reference
+on 29 October 2026):
 
 ```text
 GET  /api/project.all
@@ -18,6 +19,7 @@ POST /api/application.reload
 
 GET  /api/compose.one?composeId=...
 GET  /api/compose.loadServices?composeId=...
+GET  /api/compose.getConvertedCompose?composeId=...
 POST /api/compose.killBuild
 
 GET  /api/deployment.all?applicationId=...
@@ -26,7 +28,19 @@ GET  /api/deployment.allCentralized
 GET  /api/deployment.queueList
 GET  /api/deployment.readLogs?deploymentId=...&tail=...
 POST /api/deployment.killProcess
+
+GET  /api/schedule.list?id=...&scheduleType=...
+GET  /api/domain.byApplicationId?applicationId=...
+GET  /api/domain.byComposeId?composeId=...
 ```
+
+The latest stable Dokploy release checked for this audit is v0.30.10, released
+22 October 2026. The public API reference documents four schedule types
+(`application`, `compose`, `server`, and `dokploy-server`) and domain reads by
+application or Compose service. The mobile adapter treats these optional reads
+as capability-gated and tolerates per-target authorization failures. The
+upstream v0.30.5 release added Compose deployment with fresh volumes; this
+client does not yet expose that destructive option.
 
 The current application log contract documents a tail range of 1–10,000 plus optional `since` and `search` parameters. The mobile adapter clamps tail values and currently filters its already-bounded response locally.
 
