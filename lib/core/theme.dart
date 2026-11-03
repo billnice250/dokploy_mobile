@@ -57,6 +57,14 @@ class DokployTheme {
     );
     return ThemeData(
       useMaterial3: true,
+      visualDensity: VisualDensity.standard,
+      outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      )),
+      textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(minimumSize: const Size(48, 44))),
       brightness: Brightness.dark,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
@@ -93,6 +101,9 @@ class DokployTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          minimumSize: const Size(48, 44),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: primary,
           foregroundColor: onPrimary,
         ),
@@ -130,6 +141,14 @@ class DokployTheme {
     );
     return ThemeData(
       useMaterial3: true,
+      visualDensity: VisualDensity.standard,
+      outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 44),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      )),
+      textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(minimumSize: const Size(48, 44))),
       brightness: Brightness.light,
       colorScheme: scheme,
       scaffoldBackgroundColor: lightBg,
@@ -167,6 +186,9 @@ class DokployTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          minimumSize: const Size(48, 44),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: lightPrimary,
           foregroundColor: lightOnPrimary,
         ),

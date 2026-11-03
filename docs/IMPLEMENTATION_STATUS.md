@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last audited: 29 October 2026.
+Last updated: 3 November 2026.
 
 This document describes the code that exists today. It deliberately does not count a screen placeholder as a working feature.
 
@@ -78,7 +78,7 @@ response fixtures. Schedule and domain reads are implemented below.
 - Real backups and full database management, including create/delete,
   password management, and restore workflows.
 - Schedule creation/editing/run history and domain creation/editing.
-- Compose service inspection and terminal sessions.
+- Compose service inspection.
 - Biometrics, app lock, screenshot protection, and clipboard auto-clear.
 - Shortcut actions, push relay image, and Git enrichment.
 - Compatibility CI against disposable Dokploy versions.
@@ -96,3 +96,25 @@ response fixtures. Schedule and domain reads are implemented below.
 - A manual, draft-only GitHub Actions release workflow is scaffolded for Google
   Play internal testing and TestFlight. Store records, signing material and
   repository secrets are still required before it can upload.
+
+## Infrastructure workspace (3 November 2026)
+
+- Server cards open searchable container inventory, SSH terminals, and host diagnostics.
+- Container inventory includes image, ports, runtime status, and running-only filtering.
+  Start/stop/restart use confirmed, biometric-protected mutations on real instances.
+- Server SSH and container `sh` sessions use Dokploy's authenticated WebSocket
+  gateways and xterm rendering, with mobile control keys and terminal resize.
+  SSH keys remain on Dokploy; the phone never downloads them. Local SSH accepts
+  username/port; remote SSH uses the configuration already saved in Dokploy.
+- Sessions close on navigation disposal, instance changes, and loss of foreground.
+  Reconnection is explicit. Terminal scrollback is bounded and is not persisted.
+- Server diagnostics show CPU count, container/service/network counts, memory,
+  and disk from `docker.getServerHealth`. Missing values remain unavailable;
+  endpoint/permission failures show an error with retry rather than zero metrics.
+- Demo mode provides simulated container lifecycle and a clearly labeled terminal
+  that never executes commands. It does not require device biometrics.
+- These additions were checked against current upstream source and offline
+  transport/widget tests, not a live Dokploy installation. Older installations
+  may lack the health endpoint or the current terminal resize protocol. Docker
+  and terminal access are subject to upstream organization permissions; cloud
+  installations may disallow local terminal access.

@@ -1,7 +1,7 @@
 name: dokploy_mobile
 description: A polished, unofficial  mobile console for Dokploy.
 publish_to: "none"
-version: 1.1.0+1
+version: 1.2.0+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -25,6 +25,7 @@ dependencies:
   pkcs7: ^1.0.6
   pfx_reader: ^1.0.6
   package_info_plus: ^10.2.2
+  xterm: ^4.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

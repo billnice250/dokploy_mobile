@@ -26,9 +26,19 @@ Use a dedicated, least-privilege Dokploy token. Dokploy permissions can limit AP
 ## Not implemented yet
 
 App lock, production-instance policy, screenshot protection, clipboard expiry,
-terminal sessions, and secret reveal flows remain unavailable. UI placeholders
+secret reveal flows remain unavailable. UI placeholders
 must not be interpreted as security controls.
 
 ## Reporting
 
 Before public release, add a private security contact and coordinated disclosure policy here. Do not include API keys, credentials, or unredacted diagnostic bundles in a report.
+
+## Interactive infrastructure access
+
+Real-instance container lifecycle actions require confirmation and biometrics.
+Terminal connection requires an explicit Connect action and biometric approval.
+Terminal authentication uses the existing instance header and TLS configuration;
+SSH private keys remain on the Dokploy host. Terminal text is neither logged nor
+persisted and scrollback is limited to 2,000 lines. Backgrounding the app,
+changing instances, or closing the screen ends the session. Upstream permission
+checks remain authoritative. Demo terminals do not execute commands.

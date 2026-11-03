@@ -46,6 +46,8 @@ class ContainerInstance {
     required this.name,
     required this.state,
     required this.runType,
+    this.image = '',
+    this.ports = '',
     this.node = '',
     this.status = '',
   });
@@ -54,6 +56,8 @@ class ContainerInstance {
   final String name;
   final String state;
   final String runType;
+  final String image;
+  final String ports;
   final String node;
   final String status;
 
@@ -420,4 +424,18 @@ class DashboardSnapshot {
   final List<DeploymentModel> deployments;
   final List<ServerModel> servers;
   final List<String> attention;
+}
+
+class ServerDiagnostics {
+  const ServerDiagnostics(
+      {this.cpuCount,
+      this.containers,
+      this.services,
+      this.networks,
+      this.memoryUsed,
+      this.memoryTotal,
+      this.diskUsed,
+      this.diskTotal});
+  final num? cpuCount, containers, services, networks;
+  final num? memoryUsed, memoryTotal, diskUsed, diskTotal;
 }

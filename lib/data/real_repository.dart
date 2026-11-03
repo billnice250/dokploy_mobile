@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'dokploy_api.dart';
 import 'repository.dart';
+import '../domain/terminal_session.dart';
 import '../domain/failures.dart';
 import '../domain/models.dart';
 
@@ -15,6 +16,74 @@ class RealDokployRepository implements DokployRepository {
   dynamic _projectsCache;
   DateTime? _projectsCachedAt;
   Future<List<DeploymentModel>>? _deploymentsRequest;
+
+  @override
+  Future<ServerDiagnostics> serverDiagnostics({String? serverId}) async {
+    final raw = await api.serverDiagnostics(serverId: serverId);
+    if (raw is! Map || raw['error'] != null) {
+      throw const DokployFailure(
+          kind: DokployFailureKind.server,
+          operation: 'server health',
+          message: 'Server diagnostics are unavailable.');
+    }
+    num? value(String group, String key) {
+      final section = raw[group];
+      if (section is! Map) return null;
+      final result = num.tryParse('${section[key]}');
+      return result != null && result.isFinite && result >= 0 ? result : null;
+    }
+
+    return ServerDiagnostics(
+        cpuCount: value('resources', 'cpuCount'),
+        containers: value('containers', 'containerCount'),
+        services: value('containers', 'serviceCount'),
+        networks: value('dockerNetworks', 'count'),
+        memoryUsed: value('resources', 'memUsedBytes'),
+        memoryTotal: value('resources', 'memTotalBytes'),
+        diskUsed: value('disk', 'usedBytes'),
+        diskTotal: value('disk', 'totalBytes'));
+  }
+
+  @override
+  Future<List<ContainerInstance>> serverContainers({String? serverId}) async {
+    final raw = await api.serverContainers(serverId: serverId);
+    if (raw == null) {
+      throw const DokployFailure(
+          kind: DokployFailureKind.server,
+          operation: 'containers',
+          message: 'Container inventory is unavailable.');
+    }
+    return _list(raw)
+        .whereType<Map>()
+        .map((item) => ContainerInstance(
+              id: _s(item, ['containerId', 'Id', 'id']),
+              name: _s(item, ['name', 'Name'], 'Container'),
+              state: _s(item, ['state', 'State'], 'unknown'),
+              runType: 'native',
+              image: _s(item, ['image', 'Image']),
+              ports: _s(item, ['ports', 'Ports']),
+              status: _s(item, ['status', 'Status']),
+            ))
+        .where((item) => item.id.isNotEmpty)
+        .toList();
+  }
+
+  @override
+  Future<void> containerAction(String id, ContainerAction action,
+          {String? serverId}) =>
+      api.containerAction(id, action, serverId: serverId);
+
+  @override
+  Future<TerminalSession> openTerminal(
+          {String? serverId,
+          String? containerId,
+          String username = 'root',
+          int port = 22}) =>
+      api.openTerminal(
+          serverId: serverId,
+          containerId: containerId,
+          username: username,
+          port: port);
 
   @override
   Future<CapabilitySet> capabilities() =>

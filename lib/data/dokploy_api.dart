@@ -9,6 +9,7 @@ import 'package:web_socket_channel/io.dart';
 
 import '../domain/failures.dart';
 import '../domain/models.dart';
+import '../domain/terminal_session.dart';
 import 'tls_credentials.dart';
 
 /// Thin RPC-style Dokploy transport. Endpoint names and transport failures stay
@@ -110,6 +111,75 @@ class DokployApi {
           .data;
     } on DioException catch (error) {
       throw mapDioFailure(error, procedure);
+    }
+  }
+
+  Future<dynamic> serverDiagnostics({String? serverId}) => get(
+      'docker.getServerHealth',
+      {if (serverId != null) 'serverId': serverId, 'sinceHours': 24});
+
+  Future<dynamic> serverContainers({String? serverId}) =>
+      get('docker.getContainers', {if (serverId != null) 'serverId': serverId});
+
+  Future<void> containerAction(String id, ContainerAction action,
+      {String? serverId}) async {
+    if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(id)) {
+      throw ArgumentError('Invalid container ID');
+    }
+    await post('docker.${action.name}Container', {
+      'containerId': id,
+      if (serverId != null) 'serverId': serverId,
+    });
+  }
+
+  Future<TerminalSession> openTerminal(
+      {String? serverId,
+      String? containerId,
+      String username = 'root',
+      int port = 22}) async {
+    if (containerId != null &&
+        (!RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$').hasMatch(containerId) ||
+            containerId.length > 128)) {
+      throw ArgumentError('Invalid container ID');
+    }
+    if (port < 1 || port > 65535 || username.trim().isEmpty) {
+      throw ArgumentError('Invalid SSH connection settings');
+    }
+    final uri = _baseUri.replace(
+      scheme: _baseUri.scheme == 'https' ? 'wss' : 'ws',
+      path: containerId == null ? '/terminal' : '/docker-container-terminal',
+      queryParameters: {
+        if (containerId == null) ...{
+          'serverId': serverId ?? 'local',
+          'username': username,
+          'port': '$port',
+        } else ...{
+          'containerId': containerId,
+          'activeWay': 'sh',
+          if (serverId != null) 'serverId': serverId,
+        },
+        'cols': '80',
+        'rows': '24',
+      },
+      fragment: null,
+    );
+    final client = _webSocketClient();
+    final channel = IOWebSocketChannel.connect(uri,
+        headers: _authenticationHeaders,
+        customClient: client,
+        connectTimeout: const Duration(seconds: 10),
+        pingInterval: const Duration(seconds: 20));
+    try {
+      await channel.ready;
+      return _SocketTerminalSession(channel, client);
+    } catch (_) {
+      await channel.sink.close();
+      client?.close(force: true);
+      throw const DokployFailure(
+          kind: DokployFailureKind.connectionFailed,
+          operation: 'terminal',
+          message:
+              'Terminal connection failed. Check server availability and terminal permissions.');
     }
   }
 
@@ -577,4 +647,27 @@ String? _serverMessage(dynamic data) {
     return message.isEmpty ? null : message;
   }
   return null;
+}
+
+class _SocketTerminalSession implements TerminalSession {
+  _SocketTerminalSession(this.channel, this.client);
+  final IOWebSocketChannel channel;
+  final HttpClient? client;
+  @override
+  Stream<String> get output => channel.stream.map((event) => event is String
+      ? event
+      : utf8.decode(event as List<int>, allowMalformed: true));
+  @override
+  void write(String data) => channel.sink.add(data);
+  @override
+  void resize(int columns, int rows) => channel.sink.add(jsonEncode({
+        'type': 'resize',
+        'cols': columns.clamp(1, 1000),
+        'rows': rows.clamp(1, 1000),
+      }));
+  @override
+  Future<void> close() async {
+    await channel.sink.close();
+    client?.close(force: true);
+  }
 }

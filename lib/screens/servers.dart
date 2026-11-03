@@ -7,6 +7,9 @@ import '../core/biometric_confirmation.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
+import 'server_containers.dart';
+import 'terminal.dart';
+import 'server_diagnostics.dart';
 
 class ServersScreen extends ConsumerWidget {
   const ServersScreen({super.key});
@@ -60,6 +63,18 @@ class ServersScreen extends ConsumerWidget {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 112),
                   children: [
+                    Text('Infrastructure',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text('${items.length} servers • ${instance.name}',
+                        style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                    const SizedBox(height: 20),
                     for (final server in items)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -94,6 +109,41 @@ class ServersScreen extends ConsumerWidget {
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 16),
+                              Wrap(spacing: 8, runSpacing: 8, children: [
+                                OutlinedButton.icon(
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                ServerDiagnosticsScreen(
+                                                    server: server))),
+                                    icon: const Icon(
+                                        Icons.monitor_heart_outlined),
+                                    label: const Text('Diagnostics')),
+                                FilledButton.tonalIcon(
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                ServerContainersScreen(
+                                                    server: server))),
+                                    icon:
+                                        const Icon(Icons.inventory_2_outlined),
+                                    label: const Text('Containers')),
+                                OutlinedButton.icon(
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                            builder: (_) => TerminalScreen(
+                                                title: '${server.name} SSH',
+                                                serverId: server.id ==
+                                                        'dokploy-control-plane'
+                                                    ? null
+                                                    : server.id))),
+                                    icon: const Icon(Icons.terminal),
+                                    label: const Text('SSH terminal')),
+                              ]),
                               const SizedBox(height: 20),
                               if (!server.metricsAvailable) ...[
                                 ListTile(

@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../domain/terminal_session.dart';
 import 'repository.dart';
 import '../domain/models.dart';
 
@@ -92,6 +94,47 @@ class MockDokployRepository implements DokployRepository {
         memoryMb: 0,
         appName: 'worker'),
   ];
+
+  final _containerStates = <String, String>{};
+  @override
+  Future<ServerDiagnostics> serverDiagnostics({String? serverId}) async =>
+      const ServerDiagnostics(
+          cpuCount: 4,
+          containers: 3,
+          services: 2,
+          networks: 5,
+          memoryUsed: 2147483648,
+          memoryTotal: 8589934592,
+          diskUsed: 21474836480,
+          diskTotal: 85899345920);
+
+  @override
+  Future<List<ContainerInstance>> serverContainers({String? serverId}) async =>
+      [
+        for (final name in ['web', 'worker', 'postgres'])
+          ContainerInstance(
+              id: 'demo-$name',
+              name: name,
+              state: _containerStates['demo-$name'] ?? 'running',
+              runType: 'native',
+              image: name == 'postgres' ? 'postgres:16' : 'app:latest',
+              ports: name == 'web' ? '0.0.0.0:8080 → 80/tcp' : '',
+              status: 'Demo container'),
+      ];
+  @override
+  Future<void> containerAction(String id, ContainerAction action,
+      {String? serverId}) async {
+    _containerStates[id] =
+        action == ContainerAction.stop ? 'exited' : 'running';
+  }
+
+  @override
+  Future<TerminalSession> openTerminal(
+          {String? serverId,
+          String? containerId,
+          String username = 'root',
+          int port = 22}) async =>
+      _DemoTerminal();
 
   @override
   Future<CapabilitySet> capabilities() async => CapabilitySet.demo;
@@ -391,4 +434,24 @@ services:
   @override
   Stream<ServiceModel> watchServiceMetrics(ServiceModel service) =>
       Stream.value(service);
+}
+
+class _DemoTerminal implements TerminalSession {
+  final _output = StreamController<String>();
+  _DemoTerminal() {
+    _output.add('Demo terminal — no commands are executed.\r\n');
+  }
+  @override
+  Stream<String> get output => _output.stream;
+  @override
+  void write(String data) {
+    _output.add(data == '\r'
+        ? '\r\nDemo only. Connect an instance to run commands.\r\n'
+        : data);
+  }
+
+  @override
+  void resize(int columns, int rows) {}
+  @override
+  Future<void> close() => _output.close();
 }

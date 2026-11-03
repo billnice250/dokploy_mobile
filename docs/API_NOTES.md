@@ -61,3 +61,34 @@ Dokploy v0.29.14 exposes `GET /api/user.getPermissions`. The real repository
 caches this response for the active connection and uses its resource/action
 flags to avoid calls that would predictably return 401. A granted server
 permission does not activate features whose mobile adapters are unfinished.
+
+## Infrastructure API additions — 3 November 2026
+
+Verified against current official documentation and upstream `canary` source:
+
+- `GET docker.getContainers`: optional `serverId`; returns `containerId`, `name`,
+  `image`, `ports`, `state`, and `status`.
+- `POST docker.startContainer`, `docker.stopContainer`, `docker.restartContainer`:
+  `containerId` and optional `serverId`. Mutations are never retried automatically.
+- `GET docker.getServerHealth`: optional `serverId`, `sinceHours=24`; maps only
+  resource/count fields into an app-owned diagnostics model. No raw configuration
+  or environment secrets are exposed.
+- `/terminal`: `serverId` (or `local`), local `username` and `port`, `cols`, `rows`.
+- `/docker-container-terminal`: `containerId`, optional `serverId`, `activeWay=sh`,
+  `cols`, `rows`. Terminal input is raw text; resize frames use JSON with
+  `type=resize`, `cols`, and `rows`. API keys stay in `x-api-key` headers, and
+  custom CA/mTLS contexts are reused. A successful upgrade does not itself prove
+  shell authorization; server close/error is reflected in the session status.
+
+Sources:
+- https://docs.dokploy.com/docs/api/reference-docker
+- https://github.com/Dokploy/dokploy/blob/canary/apps/dokploy/server/api/routers/docker.ts
+- https://github.com/Dokploy/dokploy/blob/canary/packages/server/src/services/server-health.ts
+- https://github.com/Dokploy/dokploy/blob/canary/apps/dokploy/server/wss/terminal.ts
+- https://github.com/Dokploy/dokploy/blob/canary/apps/dokploy/server/wss/docker-container-terminal.ts
+- https://github.com/Dokploy/dokploy/blob/canary/packages/server/src/lib/auth.ts
+
+This is a selected infrastructure feature expansion, not exhaustive API parity.
+Server creation/editing, SSH-key management, destructive container removal,
+file management, backups/restores, and other administration APIs remain outside
+this implementation.

@@ -24,7 +24,9 @@ feature or relying on it in production.
 - Custom PEM/P7B CA chains and password-protected PKCS#12 identities
 - Projects, applications, Compose stacks, deployments, logs, and servers
 - Start, stop, redeploy, deploy, and cancel operations
-- Server health and monitoring configuration
+- Server health diagnostics and monitoring configuration
+- Searchable server container inventory with start, stop, and restart controls
+- Interactive server SSH and container shells with mobile terminal keys
 - Local deployment notifications and deep links
 - Secure credential storage through Keychain and Android secure storage
 - Mobile, tablet, dark-theme, and demo-mode support
@@ -256,8 +258,7 @@ notifications, destructive actions, or clipboard behavior.
 
 ## Current limitations
 
-Backups, schedules, domains, databases, Compose service inspection, terminal
-sessions, background push delivery, and several mobile-native integrations are
+Backups, schedules, domains, databases, Compose service inspection, background push delivery, and several mobile-native integrations are
 partial, demo-only, or planned. The definitive list is maintained in
 [Implementation Status](docs/IMPLEMENTATION_STATUS.md).
 

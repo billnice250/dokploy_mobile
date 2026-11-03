@@ -1,6 +1,16 @@
 import '../domain/models.dart';
+import '../domain/terminal_session.dart';
 
 abstract interface class DokployRepository {
+  Future<ServerDiagnostics> serverDiagnostics({String? serverId});
+  Future<List<ContainerInstance>> serverContainers({String? serverId});
+  Future<void> containerAction(String id, ContainerAction action,
+      {String? serverId});
+  Future<TerminalSession> openTerminal(
+      {String? serverId,
+      String? containerId,
+      String username = 'root',
+      int port = 22});
   Future<CapabilitySet> capabilities();
   Future<DashboardSnapshot> dashboard();
   Future<List<ProjectModel>> projects();
