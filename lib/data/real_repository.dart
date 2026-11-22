@@ -45,6 +45,24 @@ class RealDokployRepository implements DokployRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> serverSecurity(String serverId) async {
+    if (!(await capabilities()).servers) {
+      throw _unsupported('server.security');
+    }
+    final raw = await api.serverSecurity(serverId);
+    if (raw is! Map) {
+      throw const DokployFailure(
+        kind: DokployFailureKind.server,
+        operation: 'server security',
+        message: 'Server security status is unavailable.',
+      );
+    }
+    // Return a detached, shallow copy. The UI renders scalar security state;
+    // it never persists this potentially sensitive operational response.
+    return Map<String, dynamic>.from(raw);
+  }
+
+  @override
   Future<List<ContainerInstance>> serverContainers({String? serverId}) async {
     final raw = await api.serverContainers(serverId: serverId);
     if (raw == null) {
@@ -77,11 +95,13 @@ class RealDokployRepository implements DokployRepository {
   Future<TerminalSession> openTerminal(
           {String? serverId,
           String? containerId,
+          String? serviceId,
           String username = 'root',
           int port = 22}) =>
       api.openTerminal(
           serverId: serverId,
           containerId: containerId,
+          serviceId: serviceId,
           username: username,
           port: port);
 
@@ -99,6 +119,7 @@ class RealDokployRepository implements DokployRepository {
       }
 
       final serviceRead = allowed('service', 'read');
+      final backupRead = allowed('backup', 'read');
       return CapabilitySet(
         logs: serviceRead && allowed('logs', 'read'),
         deployments: allowed('deployment', 'read'),
@@ -107,9 +128,7 @@ class RealDokployRepository implements DokployRepository {
         compose: serviceRead,
         metrics: allowed('monitoring', 'read'),
         servers: allowed('server', 'read'),
-        // Backups still require response fixtures. Schedule and domain reads
-        // are implemented through their documented list procedures.
-        backups: false,
+        backups: serviceRead && backupRead,
         schedules: serviceRead,
         domains: serviceRead,
         databases: serviceRead,
@@ -130,6 +149,8 @@ class RealDokployRepository implements DokployRepository {
         'items',
         'projects',
         'deployments',
+        'backups',
+        'volumeBackups',
         'servers',
         'schedules',
         'domains',
@@ -1151,7 +1172,29 @@ class RealDokployRepository implements DokployRepository {
         message: 'This API token does not grant access to $operation.',
       );
   @override
-  Future<List<BackupModel>> backups() async => const [];
+  Future<List<BackupModel>> backups() async {
+    if (!(await capabilities()).backups) return const [];
+    final raw = await api.backups();
+    return _list(raw)
+        .whereType<Map>()
+        .map((item) {
+          final id = _s(item, ['backupId', 'id']);
+          return BackupModel(
+            id: id,
+            name: _s(item, ['name', 'prefix'], 'Backup'),
+            target: _s(item, ['serviceName', 'database', 'appName'], 'Service'),
+            status: _state(_s(item, ['status', 'lastStatus'], 'unknown')),
+            createdAt: DateTime.tryParse(_s(item,
+                    ['lastBackup', 'lastRun', 'updatedAt', 'createdAt'])) ??
+                DateTime.fromMillisecondsSinceEpoch(0),
+            sizeMb: _d(item['size']) / (1024 * 1024),
+            nextRun: DateTime.tryParse(_s(item, ['nextRun', 'nextRunAt'])),
+          );
+        })
+        .where((backup) => backup.id.isNotEmpty)
+        .toList();
+  }
+
   @override
   Future<List<ScheduleModel>> schedules() async {
     if (!(await capabilities()).schedules) return const [];

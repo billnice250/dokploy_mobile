@@ -27,6 +27,35 @@ void main() {
     expect(capabilities.servers, isFalse);
   });
 
+  test('loads backup records from the Dokploy user backups endpoint', () async {
+    final api = _FakeApi(
+      permissionPayload: const {
+        'service': {'read': true},
+        'backup': {'read': true},
+      },
+      backupPayload: const {
+        'backups': [
+          {
+            'backupId': 'backup-1',
+            'name': 'nightly',
+            'serviceName': 'postgres-main',
+            'status': 'success',
+            'createdAt': '2026-11-20T03:00:00Z',
+            'size': 1048576,
+          }
+        ]
+      },
+    );
+
+    final backups = await RealDokployRepository(api).backups();
+
+    expect(backups, hasLength(1));
+    expect(backups.single.id, 'backup-1');
+    expect(backups.single.target, 'postgres-main');
+    expect(backups.single.status, HealthState.healthy);
+    expect(backups.single.sizeMb, 1);
+  });
+
   test('does not call optional endpoints denied by permissions', () async {
     final api = _FakeApi();
     final repository = RealDokployRepository(api);
@@ -383,6 +412,7 @@ class _FakeApi extends DokployApi {
     this.serverMetricPayload = const <dynamic>[],
     this.applicationPayload = const <String, dynamic>{},
     this.applicationMonitoringPayload = const <String, dynamic>{},
+    this.backupPayload = const <dynamic>[],
   }) : super(baseUrl: 'https://dokploy.example.com', apiKey: 'test-token');
 
   final DokployFailure? serverFailure;
@@ -395,6 +425,7 @@ class _FakeApi extends DokployApi {
   final dynamic serverMetricPayload;
   final dynamic applicationPayload;
   final dynamic applicationMonitoringPayload;
+  final dynamic backupPayload;
   int projectOneCalls = 0;
   int deploymentCalls = 0;
   int serverCalls = 0;
@@ -412,6 +443,9 @@ class _FakeApi extends DokployApi {
 
   @override
   Future<dynamic> permissions() async => permissionPayload;
+
+  @override
+  Future<dynamic> backups() async => backupPayload;
 
   @override
   Future<dynamic> project(String id) async {

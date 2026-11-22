@@ -3,12 +3,14 @@ import '../domain/terminal_session.dart';
 
 abstract interface class DokployRepository {
   Future<ServerDiagnostics> serverDiagnostics({String? serverId});
+  Future<Map<String, dynamic>> serverSecurity(String serverId);
   Future<List<ContainerInstance>> serverContainers({String? serverId});
   Future<void> containerAction(String id, ContainerAction action,
       {String? serverId});
   Future<TerminalSession> openTerminal(
       {String? serverId,
       String? containerId,
+      String? serviceId,
       String username = 'root',
       int port = 22});
   Future<CapabilitySet> capabilities();

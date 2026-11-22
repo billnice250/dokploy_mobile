@@ -109,6 +109,10 @@ class MockDokployRepository implements DokployRepository {
           diskTotal: 85899345920);
 
   @override
+  Future<Map<String, dynamic>> serverSecurity(String serverId) async =>
+      const {'status': 'Demo mode', 'firewall': 'Simulated'};
+
+  @override
   Future<List<ContainerInstance>> serverContainers({String? serverId}) async =>
       [
         for (final name in ['web', 'worker', 'postgres'])
@@ -132,6 +136,7 @@ class MockDokployRepository implements DokployRepository {
   Future<TerminalSession> openTerminal(
           {String? serverId,
           String? containerId,
+          String? serviceId,
           String username = 'root',
           int port = 22}) async =>
       _DemoTerminal();

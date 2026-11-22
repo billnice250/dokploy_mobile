@@ -135,6 +135,7 @@ class DokployApi {
   Future<TerminalSession> openTerminal(
       {String? serverId,
       String? containerId,
+      String? serviceId,
       String username = 'root',
       int port = 22}) async {
     if (containerId != null &&
@@ -155,6 +156,7 @@ class DokployApi {
           'port': '$port',
         } else ...{
           'containerId': containerId,
+          if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
           'activeWay': 'sh',
           if (serverId != null) 'serverId': serverId,
         },
@@ -185,6 +187,17 @@ class DokployApi {
 
   Future<dynamic> projects() => get('project.all');
   Future<dynamic> overviewServices() => get('overview.services');
+  Future<dynamic> backups() => get('user.getBackups');
+  Future<dynamic> backupFiles({
+    required String destinationId,
+    String search = '',
+    String? serverId,
+  }) =>
+      get('backup.listBackupFiles', {
+        'destinationId': destinationId,
+        'search': search,
+        if (serverId != null && serverId.isNotEmpty) 'serverId': serverId,
+      });
   Future<dynamic> permissions() => get('user.getPermissions');
   Future<dynamic> homeStats() => get('project.homeStats');
   Future<dynamic> project(String id) => get('project.one', {'projectId': id});
@@ -257,6 +270,8 @@ class DokployApi {
         'docker.getServerHealth',
         {if (serverId != null && serverId.isNotEmpty) 'serverId': serverId},
       );
+  Future<dynamic> serverSecurity(String serverId) =>
+      get('server.security', {'serverId': serverId});
   Future<dynamic> metricsConfig() => get('user.getMetricsToken');
   Future<dynamic> serverMetrics({
     required String url,

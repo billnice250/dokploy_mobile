@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 import '../core/providers.dart';
@@ -8,10 +9,15 @@ import '../domain/terminal_session.dart';
 
 class TerminalScreen extends ConsumerStatefulWidget {
   const TerminalScreen(
-      {super.key, required this.title, this.serverId, this.containerId});
+      {super.key,
+      required this.title,
+      this.serverId,
+      this.containerId,
+      this.serviceId});
   final String title;
   final String? serverId;
   final String? containerId;
+  final String? serviceId;
   @override
   ConsumerState<TerminalScreen> createState() => _TerminalScreenState();
 }
@@ -84,6 +90,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen>
       final session = await repository.openTerminal(
           serverId: widget.serverId,
           containerId: widget.containerId,
+          serviceId: widget.serviceId,
           username: _username.text.trim(),
           port: port ?? 22);
       if (!mounted || generation != _generation) {
@@ -138,7 +145,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen(repositoryProvider, (_, next) => unawaited(_disconnect()));
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: Text(widget.title), actions: [
         TextButton(
             onPressed: _connecting
@@ -170,42 +179,119 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen>
                         decoration:
                             const InputDecoration(labelText: 'SSH port'))),
               ])),
-        ListTile(
-            dense: true,
-            leading: Icon(Icons.circle,
-                size: 10,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Row(children: [
+            Icon(Icons.circle,
+                size: 9,
                 color: _session == null ? Colors.orange : Colors.green),
-            title: Text(_status),
-            subtitle: const Text(
-                'Shell access • disconnects when you leave the app')),
+            const SizedBox(width: 9),
+            Expanded(
+                child: Text(_status,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge)),
+            if (_session != null)
+              const Text('LIVE',
+                  style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1)),
+          ]),
+        ),
         Expanded(
             child: ColoredBox(
                 color: const Color(0xFF101216),
                 child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: TerminalView(_terminal,
-                        autofocus: true,
-                        textStyle: const TerminalStyle(fontSize: 13))))),
-        SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              for (final key in {
-                'Esc': '\x1b',
-                'Tab': '\t',
-                'Ctrl-C': '\x03',
-                'Ctrl-D': '\x04',
-                '↑': '\x1b[A',
-                '↓': '\x1b[B',
-                '←': '\x1b[D',
-                '→': '\x1b[C'
-              }.entries)
-                TextButton(
-                    onPressed: _session == null
-                        ? null
-                        : () => _session!.write(key.value),
-                    child: Text(key.key)),
-            ])),
+                    padding: const EdgeInsets.all(10),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: TerminalView(_terminal,
+                          autofocus: true,
+                          keyboardType: TextInputType.text,
+                          textStyle: const TerminalStyle(fontSize: 13)),
+                    )))),
+        if (_session != null)
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              border: Border(
+                  top: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(children: [
+                  _TerminalKey(
+                      label: '⌫',
+                      tooltip: 'Backspace',
+                      onPressed: () => _session?.write('\x7f')),
+                  _TerminalKey(
+                      label: 'Tab', onPressed: () => _session?.write('\t')),
+                  _TerminalKey(
+                      label: 'Esc', onPressed: () => _session?.write('\x1b')),
+                  _TerminalKey(
+                      label: 'Ctrl-C',
+                      onPressed: () => _session?.write('\x03')),
+                  _TerminalKey(
+                      label: 'Ctrl-D',
+                      onPressed: () => _session?.write('\x04')),
+                  _TerminalKey(
+                      label: '↑', onPressed: () => _session?.write('\x1b[A')),
+                  _TerminalKey(
+                      label: '↓', onPressed: () => _session?.write('\x1b[B')),
+                  _TerminalKey(
+                      label: '←', onPressed: () => _session?.write('\x1b[D')),
+                  _TerminalKey(
+                      label: '→', onPressed: () => _session?.write('\x1b[C')),
+                  _TerminalKey(
+                      label: 'Enter', onPressed: () => _session?.write('\r')),
+                  if (keyboardOpen)
+                    IconButton(
+                      tooltip: 'Hide keyboard',
+                      onPressed: () => SystemChannels.textInput
+                          .invokeMethod<void>('TextInput.hide'),
+                      icon: const Icon(Icons.keyboard_hide_outlined),
+                    ),
+                ]),
+              ),
+            ),
+          ),
       ])),
     );
   }
+}
+
+class _TerminalKey extends StatelessWidget {
+  const _TerminalKey(
+      {required this.label, required this.onPressed, this.tooltip});
+  final String label;
+  final String? tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(46, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+          ),
+          child: tooltip == null
+              ? Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600))
+              : Tooltip(
+                  message: tooltip!,
+                  child: Text(label, style: const TextStyle(fontSize: 18))),
+        ),
+      );
 }

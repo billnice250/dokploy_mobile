@@ -13,6 +13,7 @@ import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../domain/models.dart';
 import 'compose_preview.dart';
+import 'terminal.dart';
 
 class ServiceDetailScreen extends ConsumerStatefulWidget {
   const ServiceDetailScreen({super.key, required this.serviceId});
@@ -104,6 +105,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
             onPressed: () => _showActions(
               context,
               service,
+              container: selectedContainer,
               lifecycleAvailable: lifecycleAvailable,
             ),
             icon: const Icon(Icons.more_vert),
@@ -182,7 +184,8 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
   }
 
   void _showActions(BuildContext context, ServiceModel service,
-      {required bool lifecycleAvailable}) {
+      {required bool lifecycleAvailable,
+      required ContainerInstance? container}) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -255,13 +258,31 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
                   : null,
             ),
             const Divider(),
-            const ListTile(
-              enabled: false,
-              leading: Icon(Icons.terminal),
-              title: Text('Terminal'),
-              subtitle:
-                  Text('Unavailable until the server capability is verified'),
-              trailing: UpcomingBadge(),
+            ListTile(
+              enabled: container?.running == true,
+              leading: const Icon(Icons.terminal),
+              title: const Text('Open shell'),
+              subtitle: Text(container?.running == true
+                  ? 'Open a shell in ${container!.name}'
+                  : 'Start a running container to open its shell'),
+              onTap: container?.running == true
+                  ? () {
+                      Navigator.pop(sheetContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => TerminalScreen(
+                            title: '${service.name} shell',
+                            serverId: service.serverId.isEmpty
+                                ? null
+                                : service.serverId,
+                            containerId: container!.id,
+                            serviceId: service.id,
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
             ),
           ],
         ),

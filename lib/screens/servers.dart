@@ -10,6 +10,7 @@ import '../domain/models.dart';
 import 'server_containers.dart';
 import 'terminal.dart';
 import 'server_diagnostics.dart';
+import 'server_security.dart';
 
 class ServersScreen extends ConsumerWidget {
   const ServersScreen({super.key});
@@ -143,6 +144,18 @@ class ServersScreen extends ConsumerWidget {
                                                     : server.id))),
                                     icon: const Icon(Icons.terminal),
                                     label: const Text('SSH terminal')),
+                                if (server.id != 'dokploy-control-plane')
+                                  OutlinedButton.icon(
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => ServerSecurityScreen(
+                                            server: server),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.security_outlined),
+                                    label: const Text('Security'),
+                                  ),
                               ]),
                               const SizedBox(height: 20),
                               if (!server.metricsAvailable) ...[

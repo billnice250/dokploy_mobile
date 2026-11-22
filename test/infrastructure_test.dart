@@ -95,6 +95,8 @@ void main() {
     await tester.tap(find.text('Connect'));
     await tester.pumpAndSettle();
     expect(find.text('Connected'), findsOneWidget);
+    expect(find.byTooltip('Backspace'), findsOneWidget);
+    expect(find.text('Enter'), findsOneWidget);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

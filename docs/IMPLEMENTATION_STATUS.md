@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last updated: 3 November 2026.
+Last updated: 23 November 2026.
 
 This document describes the code that exists today. It deliberately does not count a screen placeholder as a working feature.
 
@@ -30,11 +30,12 @@ These paths use the real `DokployApi` through `RealDokployRepository`; widgets d
 
 - Rich dashboard health and attention data.
 - Server CPU, memory, and disk percentages.
-- Backup center data.
+- Detailed backup size and execution history.
 - Detailed service CPU, memory, and network values.
 
-The real repository still returns an empty backup collection pending
-response fixtures. Schedule and domain reads are implemented below.
+Configured backups are loaded with `user.getBackups`; response mappings are
+still being validated against real v0.31 server fixtures. Schedule and domain
+reads are implemented below.
 
 ## Partial
 
@@ -49,7 +50,7 @@ response fixtures. Schedule and domain reads are implemented below.
   deployment-log navigation are mapped defensively. Active logs support
   pause/resume polling, search, bounded tail selection, and copy. Distinct build
   stages are not inferred because Dokploy does not expose them reliably.
-- Logs: bounded loading, filtering, tail selection, refresh, selection, long-press copy, and warning/error color are present. Live streaming, pause/resume, ranges, and export are not.
+- Logs: bounded loading, filtering, tail selection, refresh, selection, long-press copy, and warning/error color are present. Service container log streams include `serviceId` as required by Dokploy v0.31. Live streaming, pause/resume, ranges, and export are not.
 - Servers: inventory is enriched with the latest `server.getServerMetrics`
   sample for configured remote servers. The Dokploy control-plane monitoring
   configuration is also detected through `user.getMetricsToken`. Missing or
@@ -68,6 +69,10 @@ response fixtures. Schedule and domain reads are implemented below.
   `schedule.list`, `domain.byApplicationId`, and `domain.byComposeId` calls.
   Writes, run history, and domain editing remain unavailable pending fixtures
   from supported Dokploy versions.
+- Dokploy v0.31: service detail can open a terminal for its selected running
+  container and passes `serviceId` to the scoped WebSocket route. Server
+  security controls, observability destinations, service transfers, and backup
+  file browsing/downloads are not implemented.
 - Home-screen widget: Android and iOS widgets show the active instance name and
   running/stopped/failed counts from the latest dashboard load. The widget
   receives no credentials and does not make server requests; app-group signing

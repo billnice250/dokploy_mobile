@@ -34,8 +34,9 @@ GET  /api/domain.byApplicationId?applicationId=...
 GET  /api/domain.byComposeId?composeId=...
 ```
 
-The latest stable Dokploy release checked for this audit is v0.30.10, released
-22 October 2026. The public API reference documents four schedule types
+The latest stable Dokploy release checked for this audit is v0.31.4, released
+17 November 2026. Dokploy v0.31 adds server security inspection, observability
+exports, service transfers, and backup file listing/download flows. The public API reference documents four schedule types
 (`application`, `compose`, `server`, and `dokploy-server`) and domain reads by
 application or Compose service. The mobile adapter treats these optional reads
 as capability-gated and tolerates per-target authorization failures. The
@@ -45,6 +46,13 @@ client does not yet expose that destructive option.
 The current application log contract documents a tail range of 1–10,000 plus optional `since` and `search` parameters. The mobile adapter clamps tail values and currently filters its already-bounded response locally.
 
 The docs also expose groups for Server, Backup, Schedule, Domain, Postgres, MySQL, MariaDB, Mongo, Redis, Volume Backups, Rollback, Notifications and more. Their presence does not mean their response mapping is implemented; see `IMPLEMENTATION_STATUS.md`.
+
+Dokploy v0.31 terminal and log access is scoped to the originating service.
+Service container logs already include `serviceId`; service terminals now pass
+the same scope. The service detail actions menu can open a terminal for its
+selected running container. The mobile adapter does not yet expose the new
+server security controls, external log/metrics destinations, transfer actions,
+or backup-file browsing/download flows.
 
 Before shipping a store release, record actual JSON responses from a disposable test instance and lock them into fixture tests. This is more valuable than assuming response schemas from UI behavior.
 
