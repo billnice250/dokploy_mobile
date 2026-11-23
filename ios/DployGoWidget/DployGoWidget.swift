@@ -1,7 +1,28 @@
 import SwiftUI
 import WidgetKit
+import UIKit
 
 private let widgetGroup = "group.it.billnice.apps.dokploy"
+
+private struct DployGoWidgetSurface: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(iOS 17.0, *) {
+      content.containerBackground(surface, for: .widget)
+    } else {
+      content.background(surface)
+    }
+  }
+
+  private var surface: Color {
+    Color(uiColor: UIColor { traits in
+      if traits.userInterfaceStyle == .dark {
+        UIColor(red: 10 / 255, green: 10 / 255, blue: 10 / 255, alpha: 1)
+      } else {
+        UIColor(red: 244 / 255, green: 244 / 255, blue: 245 / 255, alpha: 1)
+      }
+    })
+  }
+}
 
 struct InfrastructureEntry: TimelineEntry {
   let date: Date
@@ -95,8 +116,7 @@ struct InfrastructureWidgetView: View {
       }
     }
     .padding(16)
-    .background(Color(uiColor: .secondarySystemBackground))
-    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .modifier(DployGoWidgetSurface())
     .widgetURL(URL(string: "dokploy-mobile://app"))
   }
 
@@ -156,7 +176,7 @@ struct ServerMetricsWidgetView: View {
     }
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    .background(Color(uiColor: .secondarySystemBackground))
+    .modifier(DployGoWidgetSurface())
     .widgetURL(URL(string: "dokploy-mobile://app"))
   }
 
@@ -234,7 +254,7 @@ struct CombinedWidgetView: View {
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    .background(Color(uiColor: .secondarySystemBackground))
+    .modifier(DployGoWidgetSurface())
     .widgetURL(URL(string: "dokploy-mobile://app"))
   }
 
