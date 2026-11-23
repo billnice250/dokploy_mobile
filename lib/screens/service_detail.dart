@@ -268,8 +268,7 @@ class _ServiceDetailState extends ConsumerState<ServiceDetailScreen> {
               onTap: container?.running == true
                   ? () {
                       Navigator.pop(sheetContext);
-                      Navigator.push(
-                        context,
+                      Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute<void>(
                           builder: (_) => TerminalScreen(
                             title: '${service.name} shell',

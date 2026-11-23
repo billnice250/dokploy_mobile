@@ -235,21 +235,20 @@ class _ServerContainersScreenState
                                               FilledButton.tonalIcon(
                                                   onPressed: _busy
                                                       ? null
-                                                      : () => Navigator.push(
-                                                          context,
-                                                          MaterialPageRoute<
+                                                      : () => Navigator.of(
+                                                              context,
+                                                              rootNavigator:
+                                                                  true)
+                                                          .push(MaterialPageRoute<
                                                                   void>(
-                                                              builder: (_) =>
-                                                                  TerminalScreen(
-                                                                      title: item
-                                                                          .name,
-                                                                      serverId:
-                                                                          _serverId,
-                                                                      containerId:
-                                                                          item
-                                                                              .id))),
-                                                  icon: const Icon(
-                                                      Icons.terminal),
+                                                              builder: (_) => TerminalScreen(
+                                                                  title:
+                                                                      item.name,
+                                                                  serverId:
+                                                                      _serverId,
+                                                                  containerId:
+                                                                      item.id))),
+                                                  icon: const Icon(Icons.terminal),
                                                   label: const Text('Shell')),
                                           ]),
                                     ]))),

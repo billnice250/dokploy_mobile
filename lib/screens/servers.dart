@@ -133,9 +133,9 @@ class ServersScreen extends ConsumerWidget {
                                         const Icon(Icons.inventory_2_outlined),
                                     label: const Text('Containers')),
                                 OutlinedButton.icon(
-                                    onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute<void>(
+                                    onPressed: () => Navigator.of(context,
+                                            rootNavigator: true)
+                                        .push(MaterialPageRoute<void>(
                                             builder: (_) => TerminalScreen(
                                                 title: '${server.name} SSH',
                                                 serverId: server.id ==
