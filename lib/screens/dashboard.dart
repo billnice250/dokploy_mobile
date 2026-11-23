@@ -19,13 +19,40 @@ class DashboardScreen extends ConsumerWidget {
     final instance = ref.watch(currentInstanceProvider);
     ref.listen(dashboardProvider, (previous, next) {
       next.whenData((snapshot) {
+        final server = ref
+            .read(serversProvider)
+            .valueOrNull
+            ?.where((item) => item.metricsAvailable)
+            .firstOrNull;
         unawaited(HomeWidgetBridge.update(
           instanceName: instance.name,
           running: snapshot.running,
           stopped: snapshot.stopped,
           failed: snapshot.failed,
+          serverName: server?.name ?? '',
+          cpuPercent: server?.cpu,
+          diskPercent: server?.disk,
+          diskUsedGb: server?.diskUsedGb,
+          diskTotalGb: server?.diskTotalGb,
         ));
       });
+    });
+    ref.listen(serversProvider, (previous, next) {
+      final server =
+          next.valueOrNull?.where((item) => item.metricsAvailable).firstOrNull;
+      final snapshot = ref.read(dashboardProvider).valueOrNull;
+      if (snapshot == null) return;
+      unawaited(HomeWidgetBridge.update(
+        instanceName: instance.name,
+        running: snapshot.running,
+        stopped: snapshot.stopped,
+        failed: snapshot.failed,
+        serverName: server?.name ?? '',
+        cpuPercent: server?.cpu,
+        diskPercent: server?.disk,
+        diskUsedGb: server?.diskUsedGb,
+        diskTotalGb: server?.diskTotalGb,
+      ));
     });
     final dashboard = ref.watch(dashboardProvider);
     final servers = ref.watch(serversProvider);

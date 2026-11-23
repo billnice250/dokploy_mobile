@@ -57,9 +57,16 @@ class MainActivity : FlutterFragmentActivity() {
                 .putInt("running", (args["running"] as? Number)?.toInt() ?: 0)
                 .putInt("stopped", (args["stopped"] as? Number)?.toInt() ?: 0)
                 .putInt("failed", (args["failed"] as? Number)?.toInt() ?: 0)
+                .putString("serverName", args["serverName"] as? String ?: "")
+                .putString("cpuPercent", (args["cpuPercent"] as? Number)?.toDouble()?.toString() ?: "")
+                .putString("diskPercent", (args["diskPercent"] as? Number)?.toDouble()?.toString() ?: "")
+                .putString("diskUsedGb", (args["diskUsedGb"] as? Number)?.toDouble()?.toString() ?: "")
+                .putString("diskTotalGb", (args["diskTotalGb"] as? Number)?.toDouble()?.toString() ?: "")
                 .putString("updatedAt", args["updatedAt"] as? String ?: "")
                 .apply()
             InfrastructureWidgetProvider.updateAll(this)
+            ServerMetricsWidgetProvider.updateAll(this)
+            CombinedWidgetProvider.updateAll(this)
             result.success(true)
         }
     }

@@ -13,6 +13,11 @@ class HomeWidgetBridge {
     required int running,
     required int stopped,
     required int failed,
+    String serverName = '',
+    double? cpuPercent,
+    double? diskPercent,
+    double? diskUsedGb,
+    double? diskTotalGb,
   }) async {
     try {
       return await _channel.invokeMethod<bool>('updateSummary', {
@@ -20,6 +25,11 @@ class HomeWidgetBridge {
             'running': running,
             'stopped': stopped,
             'failed': failed,
+            'serverName': serverName,
+            'cpuPercent': cpuPercent,
+            'diskPercent': diskPercent,
+            'diskUsedGb': diskUsedGb,
+            'diskTotalGb': diskTotalGb,
             'updatedAt': DateTime.now().toIso8601String(),
           }) ??
           false;

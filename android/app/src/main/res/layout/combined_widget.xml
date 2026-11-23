@@ -1,0 +1,72 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/combined_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/infrastructure_widget_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="DPLOYGO • ALL-IN-ONE"
+        android:textColor="#A1A1AA"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/combined_instance"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Open DployGo"
+        android:textColor="#F4F4F5"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+        <TextView android:id="@+id/combined_running" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="— running" android:textColor="#22C55E" android:textSize="12sp" android:textStyle="bold" />
+        <TextView android:id="@+id/combined_stopped" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="— stopped" android:textColor="#F59E0B" android:textSize="12sp" android:textStyle="bold" />
+        <TextView android:id="@+id/combined_failed" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="— failed" android:textColor="#EF4444" android:textSize="12sp" android:textStyle="bold" />
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="8dp" android:layout_marginBottom="8dp" android:background="#33333A" />
+
+    <TextView
+        android:id="@+id/combined_server"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="No monitored server"
+        android:textColor="#A1A1AA"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="4dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView android:id="@+id/combined_cpu" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="CPU  —" android:textColor="#60A5FA" android:textSize="17sp" android:textStyle="bold" />
+        <TextView android:id="@+id/combined_disk" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="DISK  —" android:textColor="#A78BFA" android:textSize="17sp" android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/combined_disk_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Refresh DployGo to load metrics"
+        android:textColor="#A1A1AA"
+        android:textSize="10sp" />
+</LinearLayout>

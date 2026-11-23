@@ -1,3 +1,5 @@
 <resources>
     <string name="infrastructure_widget_description">DployGo infrastructure status summary</string>
+    <string name="server_metrics_widget_description">CPU and disk usage for your monitored DployGo server</string>
+    <string name="combined_widget_description">Service status, CPU, and disk usage in one widget</string>
 </resources>

@@ -69,8 +69,12 @@ import WidgetKit
         result(FlutterMethodNotImplemented)
         return
       }
-      for key in ["instanceName", "running", "stopped", "failed", "updatedAt"] {
-        defaults.set(values[key], forKey: key)
+      for key in ["instanceName", "running", "stopped", "failed", "updatedAt", "serverName", "cpuPercent", "diskPercent", "diskUsedGb", "diskTotalGb"] {
+        if let value = values[key], !(value is NSNull) {
+          defaults.set(value, forKey: key)
+        } else {
+          defaults.removeObject(forKey: key)
+        }
       }
       if #available(iOS 14.0, *) {
         WidgetCenter.shared.reloadAllTimelines()
