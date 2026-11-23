@@ -100,6 +100,12 @@ jobs:
 
           echo "Workload Identity and Google Play edit access verified."
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
